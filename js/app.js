@@ -26,7 +26,7 @@ const fmtKm = km => !km ? "0 km" : km < 10 ? km.toFixed(1).replace(".", ",") + "
 const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 function hav(a, b) { const R = 6371, r = x => x * Math.PI / 180; const dLa = r(b.lat - a.lat), dLo = r(b.lon - a.lon);
   const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
-const ico = (id, cls) => `<svg${cls ? ` class="${cls}"` : ""}><use href="#i-${id}"/></svg>`;
+const ico = (id, cls) => `<svg class="ico${cls ? " " + cls : ""}"><use href="#i-${id}"/></svg>`;
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches || PREFS.anim === "reducidas";
@@ -49,14 +49,18 @@ function relDay(ds) { const t = TODAY(); if (ds === t) return "Hoy"; const d1 = 
 const TYPES = { cita: "Cita", compromiso: "Compromiso", viaje: "Viaje", llamada: "Llamada", personal: "Personal" };
 
 /* ───────────────────────── Preferencias ───────────────────────── */
-const DEF_PREFS = { nombre: "Samuel Rich", home: { name: "Bogotá D.C.", dept: "11", lat: 4.711, lon: -74.072 }, tema: "nova", fuente: "moderna",
+const COLORS = { indigo: ["#4f46e5", "#7c3aed", "Índigo"], azul: ["#2563eb", "#0ea5e9", "Azul"], esmeralda: ["#059669", "#10b981", "Esmeralda"], turquesa: ["#0d9488", "#06b6d4", "Turquesa"],
+  naranja: ["#ea580c", "#f59e0b", "Naranja"], rosa: ["#db2777", "#f43f5e", "Rosa"], violeta: ["#7c3aed", "#c026d3", "Violeta"], grafito: ["#334155", "#64748b", "Grafito"] };
+const DOR = { n: "Doradal", d: "05", lat: 5.899, lon: -74.716, sub: "Puerto Triunfo" };
+const DEF_PREFS = { nombre: "Samuel Rich", home: { name: "Bogotá D.C.", dept: "11", lat: 4.711, lon: -74.072 }, color: "indigo", fuente: "jakarta", lugares: [DOR],
   texto: "normal", sonido: true, volumen: 0.6, anim: "completas", aviso60: true, aviso15: true, avisoSistema: false, horaResumen: "06:30" };
 let PREFS = Object.assign({}, DEF_PREFS, lsGet("cronova.prefs", {}));
+if (!PREFS.v21) { delete PREFS.tema; if (PREFS.fuente === "moderna" || PREFS.fuente === "clasica") PREFS.fuente = "jakarta"; PREFS.color = PREFS.color || "indigo";
+  if (!(PREFS.lugares || []).some(p => p.n === "Doradal")) PREFS.lugares = [DOR].concat(PREFS.lugares || []); PREFS.v21 = true; lsSet("cronova.prefs", PREFS); }
 function applyPrefs() {
   const h = document.documentElement;
-  h.dataset.tema = PREFS.tema; h.dataset.fuente = PREFS.fuente; h.dataset.texto = PREFS.texto; h.dataset.anim = PREFS.anim;
-  const tc = { nova: "#06071A", esmeralda: "#03100B", grafito: "#0C0D0F", claro: "#F3F4F9" }[PREFS.tema] || "#06071A";
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = tc;
+  const c = COLORS[PREFS.color] || COLORS.indigo; h.style.setProperty("--acc", c[0]); h.style.setProperty("--acc-2", c[1]);
+  h.dataset.fuente = PREFS.fuente; h.dataset.texto = PREFS.texto; h.dataset.anim = PREFS.anim;
   $("#greetName").textContent = PREFS.nombre || "Samuel Rich";
   $("#userName").textContent = PREFS.nombre || "Samuel Rich";
   $("#avatar").textContent = (PREFS.nombre || "SR").split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
@@ -138,63 +142,95 @@ function closeSheet(instant) {
   ov.classList.add("out"); setTimeout(() => ov.remove(), 170);
 }
 
-/* ───────────────────────── Municipios ───────────────────────── */
+/* ───────────────────────── Lugares: municipios + pueblos guardados ─────────────────────────
+   1.122 municipios del DANE, más los pueblos, corregimientos y veredas que guardes
+   (Doradal viene incluido). Lo que no esté, se busca en OpenStreetMap. */
 let MUN = [], DEPT = {}, MAPDATA = null;
 const ALIAS = { "bogota": "bogota d.c.", "santa fe de bogota": "bogota d.c.", "cartagena": "cartagena de indias", "cucuta": "san jose de cucuta",
-  "tumaco": "san andres de tumaco", "mompox": "mompos", "ubate": "villa de san diego de ubate", "providencia": "providencia" };
+  "tumaco": "san andres de tumaco", "mompox": "mompos" };
 async function loadGeo() {
+  if (MAPDATA) return;
   try {
     const r = await fetch("data/colombia.json"); MAPDATA = await r.json();
     MAPDATA.depts.forEach(d => DEPT[d.c] = d.n);
     MUN = MAPDATA.mun.map(m => ({ n: m[0], d: m[1], lat: m[2], lon: m[3], cap: !!m[4], k: norm(m[0]), raw: m }));
   } catch (e) { console.warn(e); toast("No pude cargar la lista de municipios. Revisa tu conexión.", "bad"); }
 }
+const placesSaved = () => (PREFS.lugares || []).map(p => Object.assign({ k: norm(p.n), custom: true }, p));
+const allPlaces = () => placesSaved().concat(MUN);
+const placeSub = p => [p.sub, DEPT[p.d]].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(", ") + (p.cap ? " · capital" : "");
 function searchMuni(q, limit) {
   q = norm(q); if (!q) return [];
   const a = ALIAS[q] ? norm(ALIAS[q]) : q;
   const res = [];
-  MUN.forEach(m => { let s = -1; if (m.k === a) s = 0; else if (m.k.startsWith(a)) s = 1; else if (m.k.includes(" " + a)) s = 2; else if (m.k.includes(a)) s = 3;
-    else if (norm(DEPT[m.d]).startsWith(a)) s = 4; if (s >= 0) res.push([s - (m.cap ? .5 : 0), m]); });
+  allPlaces().forEach(m => { let s = -1; if (m.k === a) s = 0; else if (m.k.startsWith(a)) s = 1; else if (m.k.includes(" " + a)) s = 2; else if (m.k.includes(a)) s = 3;
+    else if (norm(DEPT[m.d]).startsWith(a) || norm(m.sub).startsWith(a)) s = 4; if (s >= 0) res.push([s - (m.cap ? .5 : 0) - (m.custom ? .6 : 0), m]); });
   return res.sort((x, y) => x[0] - y[0] || x[1].n.localeCompare(y[1].n, "es")).slice(0, limit || 8).map(r => r[1]);
 }
 function findMuni(name, dept) {
   if (!name) return null; const q = norm(name); const a = ALIAS[q] ? norm(ALIAS[q]) : q;
-  const ex = MUN.filter(m => m.k === a); if (ex.length) return ex.find(m => m.d === dept) || ex.find(m => m.cap) || ex[0];
+  const ex = allPlaces().filter(m => m.k === a); if (ex.length) return ex.find(m => m.d === dept) || ex.find(m => m.custom) || ex.find(m => m.cap) || ex[0];
   return searchMuni(name, 1)[0] || null;
 }
-const muniLabel = m => m ? m.n + (DEPT[m.d] && m.d !== "11" ? ", " + DEPT[m.d] : "") : "";
+const muniLabel = m => m ? m.n + (m.sub ? " (" + m.sub + ")" : "") + (DEPT[m.d] && m.d !== "11" ? ", " + DEPT[m.d] : "") : "";
 function evLoc(e) {
   if (!e) return null;
-  if (e.lat != null && e.lon != null) return { name: e.city, dept: e.dept, lat: Number(e.lat), lon: Number(e.lon) };
-  if (e.city) { const m = findMuni(e.city, e.dept); if (m) return { name: m.n, dept: m.d, lat: m.lat, lon: m.lon }; }
+  if (e.lat != null && e.lon != null) return { name: e.city, dept: e.dept, lat: Number(e.lat), lon: Number(e.lon), sub: e.sub || "" };
+  if (e.city) { const m = findMuni(e.city, e.dept); if (m) return { name: m.n, dept: m.d, lat: m.lat, lon: m.lon, sub: m.sub || "" }; }
   return null;
 }
-const locLabel = l => l ? l.name + (l.dept && DEPT[l.dept] && l.dept !== "11" ? ", " + DEPT[l.dept] : "") : "";
+const locLabel = l => l ? l.name + (l.sub ? " (" + l.sub + ")" : "") + (l.dept && DEPT[l.dept] && l.dept !== "11" ? ", " + DEPT[l.dept] : "") : "";
+const locOf = p => p ? { city: p.n, dept: p.d, lat: p.lat, lon: p.lon, sub: p.sub || "" } : { city: "", dept: "", lat: null, lon: null, sub: "" };
 const homeLoc = () => PREFS.home && PREFS.home.lat != null ? PREFS.home : DEF_PREFS.home;
 const sameLoc = (a, b) => a && b && hav(a, b) < 3;
-
-/* Combobox de municipios reutilizable */
-function makeCombo(box, input, onPick) {
-  let list = null, items = [], act = -1;
-  function close() { if (list) { list.remove(); list = null; } act = -1; }
-  function render() {
-    close(); const q = input.value.trim(); if (!q) return;
-    items = searchMuni(q, 8);
-    list = document.createElement("div"); list.className = "combo-list"; list.setAttribute("role", "listbox");
-    list.innerHTML = items.length ? items.map((m, i) => `<button type="button" role="option" data-i="${i}"><span>${esc(m.n)}${m.cap ? ' <span class="chip" style="--c:var(--acc-2);padding:0 6px;font-size:.6rem">capital</span>' : ""}</span><span class="d">${esc(DEPT[m.d] || "")}</span></button>`).join("")
-      : `<div class="empty">No encontré ese municipio.</div>`;
-    box.appendChild(list);
-    list.addEventListener("pointerdown", e => { const b = e.target.closest("button"); if (!b) return; e.preventDefault(); pick(items[+b.dataset.i]); });
+function savePlace(p) {
+  const list = (PREFS.lugares || []).slice();
+  if (!list.some(x => norm(x.n) === norm(p.n) && Math.abs(x.lat - p.lat) < .02 && Math.abs(x.lon - p.lon) < .02)) {
+    list.unshift({ n: p.n, d: p.d || "", lat: +(+p.lat).toFixed(4), lon: +(+p.lon).toFixed(4), sub: p.sub || "" }); savePrefs({ lugares: list.slice(0, 60) }, true);
   }
-  function pick(m) { if (!m) return; input.value = muniLabel(m); close(); onPick(m); }
-  input.addEventListener("input", () => { input.dataset.picked = ""; render(); });
+}
+/* Búsqueda en OpenStreetMap para pueblos, corregimientos y veredas */
+async function osmSearch(q) {
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=co&accept-language=es&q=" + encodeURIComponent(q);
+  const r = await fetch(url, { headers: { "Accept": "application/json" } }); const j = await r.json();
+  const deptOf = st => { const s = norm(st).replace(/^departamento de(l)? /, ""); if (s.includes("bogota")) return "11"; return Object.keys(DEPT).find(c => norm(DEPT[c]) === s || s.includes(norm(DEPT[c]))) || ""; };
+  return (j || []).filter(x => x.lat && x.lon).map(x => { const a = x.address || {};
+    const n = x.name || a.village || a.hamlet || a.town || a.city || q;
+    const sub = a.municipality || a.county || a.city || a.town || "";
+    return { n, d: deptOf(a.state || ""), lat: +x.lat, lon: +x.lon, sub: norm(sub) === norm(n) ? "" : sub, k: norm(n), osm: true }; })
+    .filter((v, i, arr) => arr.findIndex(w => w.k === v.k && Math.abs(w.lat - v.lat) < .01) === i);
+}
+
+/* Buscador reutilizable */
+function makeCombo(box, input, onPick) {
+  let list = null, items = [], act = -1, tok = 0;
+  function close() { if (list) { list.remove(); list = null; } act = -1; }
+  function draw(html) { close(); list = document.createElement("div"); list.className = "combo-list"; list.setAttribute("role", "listbox"); list.innerHTML = html; box.appendChild(list);
+    list.addEventListener("pointerdown", e => { const b = e.target.closest("button"); if (!b) return; e.preventDefault();
+      if (b.dataset.osm != null) return osm(); pick(items[+b.dataset.i]); }); }
+  const row = (m, i) => `<button type="button" role="option" data-i="${i}"><span>${esc(m.n)}${m.custom ? ' <span class="badge" style="--c:var(--acc);padding:0 6px;font-size:.66rem">guardado</span>' : ""}</span><span class="d">${esc(placeSub(m))}</span></button>`;
+  function render() {
+    const q = input.value.trim(); if (!q) return close();
+    items = searchMuni(q, 7);
+    draw((items.length ? items.map(row).join("") : `<div class="empty">No está en la lista de municipios.</div>`) +
+      `<button type="button" class="more" data-osm>${ico("buscar")}Buscar "${esc(q)}" en pueblos y veredas</button>`);
+  }
+  async function osm() {
+    const q = input.value.trim(); if (!q) return; const my = ++tok;
+    draw(`<div class="empty">Buscando "${esc(q)}" en OpenStreetMap…</div>`);
+    try { const r = await osmSearch(q); if (my !== tok) return; items = r;
+      draw(r.length ? r.map(row).join("") : `<div class="empty">No encontré "${esc(q)}". Prueba con otro nombre o usa tu ubicación.</div>`); }
+    catch (e) { if (my === tok) draw(`<div class="empty">No pude buscar en internet ahora. Intenta de nuevo.</div>`); }
+  }
+  function pick(m) { if (!m) return; if (m.osm) { savePlace(m); toast("Guardé " + m.n + " en tus lugares.", "ok", "toque"); } input.value = muniLabel(m); input.dataset.picked = "1"; close(); onPick(m); }
+  input.addEventListener("input", () => { input.dataset.picked = ""; tok++; render(); });
   input.addEventListener("focus", () => { if (input.value && !input.dataset.picked) render(); });
-  input.addEventListener("blur", () => setTimeout(close, 120));
+  input.addEventListener("blur", () => setTimeout(close, 150));
   input.addEventListener("keydown", e => {
     if (!list) return; const bs = [...list.querySelectorAll("button")];
     if (e.key === "ArrowDown") { e.preventDefault(); act = Math.min(bs.length - 1, act + 1); }
     else if (e.key === "ArrowUp") { e.preventDefault(); act = Math.max(0, act - 1); }
-    else if (e.key === "Enter") { e.preventDefault(); pick(items[act < 0 ? 0 : act]); return; }
+    else if (e.key === "Enter") { e.preventDefault(); const b = bs[act < 0 ? 0 : act]; if (!b) return; if (b.dataset.osm != null) osm(); else pick(items[+b.dataset.i]); return; }
     else if (e.key === "Escape") { close(); return; } else return;
     bs.forEach((b, i) => b.classList.toggle("act", i === act)); bs[act] && bs[act].scrollIntoView({ block: "nearest" });
   });
@@ -284,8 +320,11 @@ async function pushPrefs() {
 }
 function setSync() {
   const n = Object.keys(queue).length; const online = S.mode === "db";
-  $("#syncCard").innerHTML = `<span class="led ${online && !n ? "" : "off"}"></span><div><b>${online ? (n ? n + " cambio(s) por subir" : "Sincronizado") : "Sin conexión a la nube"}</b><br>${S.events.length} eventos guardados</div>`;
+  const p = $("#syncPill"); p.dataset.estado = online ? (n ? "pend" : "ok") : "off";
+  $("#syncTxt").textContent = online ? (n ? n + " por subir" : "Guardado en la nube") : "Sin conexión";
   $("#userEmail").textContent = session && session.user ? session.user.email : "";
+  const rc = S.calls.filter(c => c.status === "ready").length, um = S.emails.filter(m => !m.read).length;
+  $("#badgeCalls").hidden = !rc; $("#badgeCalls").textContent = rc; $("#badgeMail").hidden = !um; $("#badgeMail").textContent = um;
 }
 let gotPrefs = false;
 async function loadAll() {
@@ -356,10 +395,10 @@ $("#newBtnTab").addEventListener("click", () => openEventSheet());
 $("#moreBtn").addEventListener("click", () => {
   const sh = openSheet(`<div class="sheet-h"><h2>Más</h2><button class="icon-btn" data-close aria-label="Cerrar">${ico("x")}</button></div>
     <div class="more-grid">
-      <a href="#asistente">${ico("ia")}Asistente IA<span>Agenda hablando</span></a>
       <a href="#llamadas">${ico("llamada")}Llamadas<span>Guiones con IA</span></a>
       <a href="#correo">${ico("correo")}Correo<span>Compromisos en tu bandeja</span></a>
-      <a href="#ajustes">${ico("ajustes")}Ajustes<span>Colores, casa, sonidos</span></a>
+      <a href="#mapa">${ico("mapa")}Mapa y rutas<span>Km y tiempos del mes</span></a>
+      <a href="#ajustes">${ico("ajustes")}Ajustes<span>Color, casa, sonidos</span></a>
     </div>`, { label: "Más opciones" });
   sh.querySelectorAll("a").forEach(a => a.addEventListener("click", () => closeSheet(true)));
 });
@@ -381,85 +420,74 @@ function prevLocated(d, skipId) {   // lugar desde donde llegas a esta cita: la 
 
 /* ───────────────────────── INICIO ───────────────────────── */
 let nextEv = null, nextTrip = null, nextTripFor = "";
+const cap1 = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 function renderInicio() {
-  const now = NOW(); const all = sorted();
+  const now = NOW(); const all = sorted(); const y = now.getFullYear();
+  $("#homeTitle").textContent = cap1(fmtDay(now));
+  const pct = dayOfYear() / daysInYear(y);
+  $("#homeSub").innerHTML = `Quedan <b style="color:var(--text)">${daysLeftYear()} días</b> de ${y} <div class="progress" style="width:min(260px,60vw);margin-top:6px"><i style="width:${(pct * 100).toFixed(1)}%"></i></div>`;
   const up = all.filter(e => !e.done && evEnd(e) >= now);
   nextEv = up[0] || null;
+  // Avisos importantes arriba (solo si hay)
+  const bn = [];
+  up.filter(e => evStart(e) - now < 2 * 36e5 && evStart(e) > now).forEach(e => bn.push(["red", "alerta", `En ${fmtDur((evStart(e) - now) / 6e4)}: ${e.title}`]));
+  all.filter(e => !e.done && evEnd(e) < new Date(now - 30 * 6e4) && now - evStart(e) < 7 * 864e5).slice(0, 2).forEach(e => bn.push(["", "info", `¿Asististe a "${e.title}"?`, e.id]));
+  (monthWarn[y + "-" + now.getMonth()] || []).slice(0, 2).forEach(w => bn.push(["red", "carro", w]));
+  const readyCalls = S.calls.filter(c => c.status === "ready").length;
+  if (readyCalls) bn.push(["blue", "llamada", readyCalls === 1 ? "Tienes 1 llamada lista para hacer" : `Tienes ${readyCalls} llamadas listas para hacer`, null, "#llamadas"]);
+  $("#banners").innerHTML = bn.map(b => `<div class="banner ${b[0]}">${ico(b[1])}<div class="x">${esc(b[2])}</div>${b[3] ? `<button class="btn sm" data-done="${esc(b[3])}">Sí, asistí</button>` : ""}${b[4] ? `<a class="btn sm" href="${b[4]}">Ver</a>` : ""}</div>`).join("");
+  // Indicadores
+  const t = TODAY(); const wEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+  const nHoy = onDay(t).filter(e => !e.done).length, nSem = all.filter(e => e.date >= t && evStart(e) < wEnd).length;
+  const K = [["k-azul", "agenda", nHoy, "Hoy", nHoy ? "por cumplir" : "día libre", "#agenda"], ["k-morado", "reloj", nSem, "Próximos 7 días", "compromisos", "#agenda"],
+    ["k-naranja", "campana", up.length, "Pendientes", "de hoy en adelante", "#agenda"], ["k-verde", "llamada", readyCalls, "Llamadas", "por hacer", "#llamadas"]];
+  $("#kpis").innerHTML = K.map(k => `<a class="card kpi ${k[0]} ${k[2] ? "" : "cero"}" href="${k[5]}"><span class="k-ico">${ico(k[1])}</span><span class="k-num">${k[2]}</span><span class="k-lbl">${k[3]}</span><span class="k-sub">${k[4]}</span></a>`).join("");
+  // Próximo compromiso
   const nc = $("#nextCard");
   if (!nextEv) {
-    nc.innerHTML = `<div class="eyebrow">Próximo compromiso</div><div class="next-title">Tu agenda está libre</div>
-      <p class="muted" style="margin:0">Agrega una cita o pídele a la IA que te organice el día.</p>
-      <div class="actions"><button class="btn primary" data-new>${ico("plus")}Agregar la primera cita</button><a class="btn" href="#asistente">${ico("ia")}Hablar con la IA</a></div>`;
+    nc.style.removeProperty("--c");
+    nc.innerHTML = `<div class="eyebrow">Próximo compromiso</div><div class="next-title">Tu agenda está libre</div><p class="muted" style="margin:0">Agrega una cita o pídele a la IA que te organice.</p>
+      <div class="actions"><button class="btn primary" data-new>${ico("plus")}Nueva cita</button><a class="btn" href="#asistente">${ico("ia")}Hablar con la IA</a></div>`;
   } else {
-    const L = evLoc(nextEv);
-    nc.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="eyebrow">Próximo compromiso</span><span class="chip ${typeC(nextEv.type)}"><i></i>${TYPES[nextEv.type] || "Cita"}</span>${isEx(nextEv) ? '<span class="tag">EJEMPLO</span>' : ""}</div>
+    const L = evLoc(nextEv); nc.style.setProperty("--c", `var(--t-${TYPES[nextEv.type] ? nextEv.type : "cita"})`);
+    nc.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="eyebrow">Próximo compromiso</span><span class="badge ${typeC(nextEv.type)}"><i></i>${TYPES[nextEv.type] || "Cita"}</span>${isEx(nextEv) ? '<span class="tag">EJEMPLO</span>' : ""}</div>
       <div class="next-title">${esc(nextEv.title)}</div>
-      <div class="meta-row"><span>${ico("agenda")}${esc(fmtDay(evStart(nextEv)))}</span><span>${ico("reloj")}${fmtTime(nextEv.time)}</span>${L ? `<span>${ico("pin")}${esc(locLabel(L))}${nextEv.place ? " · " + esc(nextEv.place) : ""}</span>` : ""}</div>
+      <div class="meta-row"><span>${ico("agenda")}${esc(cap1(relDay(nextEv.date) || fmtDay(evStart(nextEv))))}</span><span>${ico("reloj")}${fmtTime(nextEv.time)}</span>${L ? `<span>${ico("pin")}${esc(locLabel(L))}${nextEv.place ? " · " + esc(nextEv.place) : ""}</span>` : ""}</div>
       <div class="count" id="countdown"></div>
       <div id="nextTrip"></div>
-      <div class="actions">${L ? `<a class="btn sm" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Abrir en Waze</a><button class="btn sm" data-mapto="${esc(nextEv.id)}">${ico("mapa")}Ver en el mapa</button>` : ""}
-        <button class="btn sm ghost" data-done="${esc(nextEv.id)}">${ico("check")}Marcar cumplida</button><button class="btn sm ghost" data-edit="${esc(nextEv.id)}">${ico("edit")}Editar</button></div>`;
+      <div class="actions">${L ? `<a class="btn sm waze" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a>` : ""}<button class="btn sm" data-done="${esc(nextEv.id)}">${ico("check")}Cumplida</button><button class="btn sm ghost" data-edit="${esc(nextEv.id)}">${ico("edit")}Editar</button></div>`;
     updateCountdown();
     if (L && !sameLoc(L, homeLoc())) {
       const key = nextEv.id + rKey(homeLoc(), L);
       const paint = r => { const box = $("#nextTrip"); if (!box || !r) return;
         const leave = new Date(evStart(nextEv).getTime() - (r.min + 15) * 6e4);
-        box.innerHTML = `<div class="trip">${ico(r.src === "vuelo" ? "avion" : "carro")}<span>Desde tu casa: <b>${tripText(r)}</b></span>${r.src !== "vuelo" ? `<span class="muted">Sal antes de las <b>${fmtClock(leave)} ${leave.getHours() >= 12 ? "p. m." : "a. m."}</b>${ymd(leave) !== nextEv.date ? " (" + fmtShort(leave) + ")" : ""}</span>` : ""}</div>`; };
+        box.innerHTML = `<div class="trip">${ico(r.src === "vuelo" ? "avion" : "carro")}<span>Desde tu casa: <b>${tripText(r)}</b></span>${r.src !== "vuelo" && nextEv.time ? `<span>· sal antes de las <b>${fmtClock(leave)} ${leave.getHours() >= 12 ? "p. m." : "a. m."}</b>${ymd(leave) !== nextEv.date ? " (" + fmtShort(leave) + ")" : ""}</span>` : ""}</div>`; };
       if (nextTripFor === key && nextTrip) paint(nextTrip);
-      else { $("#nextTrip").innerHTML = `<div class="trip muted">${ico("carro")}Calculando trayecto desde tu casa…</div>`;
+      else { $("#nextTrip").innerHTML = `<div class="trip">${ico("carro")}Calculando el trayecto desde tu casa…</div>`;
         routeInfo(homeLoc(), L).then(r => { nextTrip = r; nextTripFor = key; paint(r); }); }
     }
   }
-  // Año y semana
-  const y = now.getFullYear(), total = daysInYear(y), doy = dayOfYear(), pct = doy / total, C = 2 * Math.PI * 48;
-  const wk = []; for (let i = 0; i < 7; i++) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i); wk.push(d); }
-  const wkCount = all.filter(e => { const d = evStart(e); return d >= new Date(ymd(now) + "T00:00") && d < new Date(wk[6].getFullYear(), wk[6].getMonth(), wk[6].getDate() + 1); }).length;
-  $("#yearCard").innerHTML = `<div class="card-h"><h2>Tu tiempo</h2><span class="meta">${y}</span></div>
-    <div class="year"><svg class="ring" viewBox="0 0 120 120" role="img" aria-label="Has recorrido el ${Math.round(pct * 100)} % del año">
-      <circle class="bg" cx="60" cy="60" r="48"/><circle class="fg" cx="60" cy="60" r="48" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct)).toFixed(1)}"/>
-      <text x="60" y="62" text-anchor="middle">${daysLeftYear()}</text><text class="sub" x="60" y="80" text-anchor="middle">DÍAS RESTAN</text></svg>
-      <div><div style="font-family:var(--f-display);font-size:1.15rem;font-weight:600;line-height:1.3">Quedan ${daysLeftYear()} días de ${y}</div>
-      <div class="muted" style="font-size:.86rem;margin-top:4px">Llevas el ${Math.round(pct * 100)} % del año. Esta semana tienes <b style="color:var(--fg)">${wkCount}</b> ${wkCount === 1 ? "compromiso" : "compromisos"}.</div></div></div>
-    <div class="week">${wk.map((d, i) => { const ds = ymd(d); const evs = onDay(ds);
-      return `<button type="button" class="${i === 0 ? "today" : ""}" data-goday="${ds}" aria-label="${esc(fmtDay(d))}: ${evs.length} eventos"><span class="wd">${DOWS[(d.getDay() + 6) % 7]}</span><span class="wn">${d.getDate()}</span><span class="dots">${evs.slice(0, 3).map(e => `<i style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})"></i>`).join("")}</span></button>`; }).join("")}</div>`;
-  // Cifras
-  const mo = now.getMonth();
-  const monthEv = all.filter(e => { const d = parseYmd(e.date); return d.getFullYear() === y && d.getMonth() === mo; });
-  const munis = new Set(monthEv.map(e => { const l = evLoc(e); return l ? l.name : null; }).filter(Boolean));
-  const km = monthKm[y + "-" + mo];
-  if (km == null && MUN.length && !monthBusy[y + "-" + mo]) { const key = y + "-" + mo; monthBusy[key] = 1; computeMonth(y, mo).then(() => { delete monthBusy[key]; if (current === "inicio") renderInicio(); }); }
-  $("#stats").innerHTML = [
-    ["Este mes", monthEv.length, monthEv.filter(e => e.done).length + " cumplidos", "agenda"],
-    ["Pendientes", up.length, "de hoy en adelante", "reloj"],
-    ["Municipios", munis.size, [...munis].slice(0, 3).join(", ") || "sin salidas este mes", "pin"],
-    ["Ruta del mes", km != null ? fmtKm(km) : "—", km != null ? "por carretera" : "abre el mapa para calcularla", "ruta"]
-  ].map(s => `<div class="card stat s3"><div class="lab">${s[0]}${ico(s[3])}</div><div class="val">${s[1]}</div><div class="sub">${esc(s[2])}</div></div>`).join("");
-  // Hoy
-  const tdy = onDay(TODAY());
+  // Hoy y próximos días
+  const tdy = onDay(t);
   $("#todayCount").textContent = tdy.length ? tdy.length + " en agenda" : "";
-  $("#todayTl").innerHTML = tdy.length ? tdy.map(tlItem).join("") : `<div class="empty">Hoy no tienes nada agendado.<button class="btn sm" data-new>${ico("plus")}Agregar algo para hoy</button></div>`;
-  // Alertas
-  const al = [];
-  up.filter(e => evStart(e) - now < 48 * 36e5).forEach(e => { const m = (evStart(e) - now) / 6e4;
-    al.push({ c: m < 120 ? "var(--bad)" : "var(--acc)", t: `${m < 0 ? "En curso" : m < 60 ? "En " + Math.round(m) + " min" : relDay(e.date) === "Hoy" ? "Hoy " + fmtTime(e.time) : "Mañana " + fmtTime(e.time)} · ${e.title}` }); });
-  all.filter(e => !e.done && evEnd(e) < new Date(now - 30 * 6e4) && now - evStart(e) < 7 * 864e5).forEach(e => al.push({ c: "var(--warn)", t: `¿Asististe a "${e.title}" (${fmtShort(evStart(e))})?`, id: e.id }));
-  (monthWarn[y + "-" + mo] || []).forEach(w => al.push({ c: "var(--bad)", t: w }));
-  S.calls.filter(c => c.status === "ready").forEach(c => al.push({ c: "var(--t-llamada)", t: `Llamada pendiente: ${c.name}` }));
-  $("#alerts").innerHTML = al.length ? al.slice(0, 6).map(a => `<div class="alert" style="--c:${a.c}"><i></i><div class="x">${esc(a.t)}</div>${a.id ? `<button class="btn sm" data-done="${esc(a.id)}">Sí</button>` : ""}</div>`).join("")
-    : `<div class="empty">Nada urgente. Todo bajo control, ${esc((PREFS.nombre || "").split(" ")[0] || "")}.</div>`;
-  if (!$("#brief").dataset.filled) $("#brief").innerHTML = `<span class="muted">Toca <b>Generar</b> y la IA junta tus citas de hoy, lo que viene mañana y tus correos sin leer en un solo resumen.</span>`;
+  $("#todayTl").innerHTML = tdy.length ? tdy.map(e => tlItem(e)).join("") : `<div class="empty">${ico("agenda")}Hoy no tienes nada agendado.<button class="btn sm" data-new>${ico("plus")}Agregar algo para hoy</button></div>`;
+  const wk = all.filter(e => e.date > t && evStart(e) < wEnd);
+  $("#weekTl").innerHTML = wk.length ? wk.slice(0, 6).map(e => tlItem(e, true)).join("") + (wk.length > 6 ? `<a class="btn sm ghost" href="#agenda">+${wk.length - 6} más</a>` : "") : `<div class="empty">${ico("reloj")}Semana despejada.</div>`;
+  if (!$("#brief").dataset.filled) $("#brief").innerHTML = `<span class="muted">Toca <b>Generar</b> y la IA junta tus citas de hoy, lo de mañana y tus correos sin leer en un solo resumen.</span>`;
+  const wkKey = y + "-" + now.getMonth();
+  if (monthKm[wkKey] == null && MUN.length && !monthBusy[wkKey]) { monthBusy[wkKey] = 1; computeMonth(y, now.getMonth()).then(() => { delete monthBusy[wkKey]; if (current === "inicio" && (monthWarn[wkKey] || []).length) renderInicio(); }); }
 }
 function updateCountdown() {
   const box = $("#countdown"); if (!box || !nextEv) return;
   const ms = evStart(nextEv) - NOW();
-  if (ms <= 0) { box.innerHTML = `<div style="flex:1"><b style="color:var(--ok)">Ahora</b><span>en curso</span></div>`; return; }
+  if (ms <= 0) { box.innerHTML = `<div><b style="color:var(--ok)">Ahora</b><span>en curso</span></div>`; return; }
   const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4), s = Math.floor(ms % 6e4 / 1e3);
-  box.innerHTML = `<div><b>${d}</b><span>días</span></div><div><b>${pad(h)}</b><span>horas</span></div><div><b>${pad(m)}</b><span>min</span></div><div><b>${pad(s)}</b><span>seg</span></div>`;
+  box.innerHTML = (d ? `<div><b>${d}</b><span>${d === 1 ? "día" : "días"}</span></div>` : "") + `<div><b>${pad(h)}</b><span>horas</span></div><div><b>${pad(m)}</b><span>min</span></div><div><b>${pad(s)}</b><span>seg</span></div>`;
 }
-function tlItem(e) {
-  const L = evLoc(e);
-  return `<div class="tl-item ${e.done ? "done" : ""}"><div class="tl-time">${e.time || "—"}</div><div class="tl-dot" style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})"></div>
-    <div class="tl-body"><div class="t">${esc(e.title)} ${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div><div class="s">${esc(TYPES[e.type] || "")}${L ? " · " + esc(locLabel(L)) : ""}${e.place ? " · " + esc(e.place) : ""}</div></div>
+function tlItem(e, withDate) {
+  const L = evLoc(e); const c = `var(--t-${TYPES[e.type] ? e.type : "cita"})`;
+  return `<div class="tl-item ${e.done ? "done" : ""}" style="--c:${c}"><div class="tl-time">${e.time || "—"}${withDate ? `<small>${esc(fmtShort(evStart(e)))}</small>` : ""}</div>
+    <div class="tl-body"><div class="t">${esc(e.title)} ${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div><div class="s">${esc(TYPES[e.type] || "")}${L ? " · " + esc(L.name) : ""}${e.place ? " · " + esc(e.place) : ""}</div></div>
     <button class="icon-btn" data-toggle="${esc(e.id)}" aria-label="${e.done ? "Marcar pendiente" : "Marcar cumplida"}" title="${e.done ? "Marcar pendiente" : "Marcar cumplida"}">${ico("check")}</button></div>`;
 }
 
@@ -490,11 +518,11 @@ function confirmDelete(id) {
 let calM = minMonth(), selDay = TODAY(), agView = "mes";
 function renderAgenda() {
   if (calM < minMonth()) calM = minMonth(); if (calM > maxMonth()) calM = maxMonth();
-  $("#calMonth").textContent = MONTHS[calM.getMonth()] + " " + calM.getFullYear();
+  $("#agSub").textContent = "Desde hoy hasta el 31 de diciembre de " + (NOW().getFullYear() + 1) + ".";
+  $("#calMonth").textContent = cap1(MONTHS[calM.getMonth()]) + " " + calM.getFullYear();
   $("#calPrev").disabled = calM <= minMonth(); $("#calNext").disabled = calM >= maxMonth();
   $("#vwMes").setAttribute("aria-pressed", agView === "mes"); $("#vwLista").setAttribute("aria-pressed", agView === "lista");
   $("#calWrap").hidden = agView !== "mes"; $("#listWrap").hidden = agView !== "lista";
-  $$("#calPrev,#calNext,#calMonth").forEach(el => el.style.visibility = agView === "mes" ? "" : "hidden");
   if (agView === "lista") return renderUpList();
   const first = new Date(calM), offset = (first.getDay() + 6) % 7, start = new Date(first); start.setDate(1 - offset);
   const today = TODAY();
@@ -504,34 +532,32 @@ function renderAgenda() {
     if (i >= 35 && d.getMonth() !== calM.getMonth()) break;
     const ds = ymd(d), out = d.getMonth() !== calM.getMonth(), evs = onDay(ds), past = isPastDay(ds);
     html += `<button type="button" class="day ${out ? "out" : ""} ${ds === today ? "today" : ""} ${ds === selDay ? "sel" : ""} ${past ? "past" : ""}" ${out ? 'tabindex="-1" aria-hidden="true"' : `data-day="${ds}"`} aria-label="${esc(fmtDay(d))}${past ? " (ya pasó)" : ""}, ${evs.length} eventos">
-      <span class="n"><b>${d.getDate()}</b>${evs.some(e => { const l = evLoc(e); return l && !sameLoc(l, homeLoc()); }) ? `<svg style="width:13px;height:13px;stroke:var(--t-viaje);fill:none;stroke-width:2"><use href="#i-pin"/></svg>` : ""}</span>
+      <span class="n"><b>${d.getDate()}</b></span>
       ${evs.slice(0, 3).map(e => `<span class="ev" style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})">${esc((e.time ? e.time + " " : "") + e.title)}</span>`).join("")}
       ${evs.length > 3 ? `<span class="more">+${evs.length - 3} más</span>` : ""}</button>`;
   }
   $("#cal").innerHTML = html;
-  $("#legend").innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="chip c-${k}"><i></i>${v}</span>`).join("");
+  $("#legend").innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="badge c-${k}"><i></i>${v}</span>`).join("");
   const sd = parseYmd(selDay), rel = relDay(selDay), past = isPastDay(selDay);
-  $("#dayBig").innerHTML = `<b>${sd.getDate()}</b><span>${rel ? `<b style="font-size:inherit;color:var(--acc-2)">${rel}</b><br>` : ""}${esc((w => w[0].toUpperCase() + w.slice(1))(sd.toLocaleDateString("es-CO", { weekday: "long" })) + " · " + MONTHS[sd.getMonth()] + " de " + sd.getFullYear())}</span>`;
+  $("#dayBig").innerHTML = `<span class="d">${sd.getDate()}</span><div><div class="t">${esc(rel || cap1(sd.toLocaleDateString("es-CO", { weekday: "long" })))}</div><div class="s">${esc(cap1(fmtDay(sd)))}</div></div>`;
   const list = onDay(selDay);
-  $("#dayList").innerHTML = list.length ? list.map(evCard).join("") : `<div class="empty">${past ? "Este día ya pasó." : "Día libre."}</div>`;
+  $("#dayList").innerHTML = list.length ? list.map(evCard).join("") : `<div class="empty">${ico(past ? "reloj" : "agenda")}${past ? "Este día ya pasó." : "Día libre."}</div>`;
   const add = $("#dayAdd"); add.disabled = past; add.innerHTML = past ? `${ico("info")}Este día ya pasó` : `${ico("plus")}Agregar en este día`;
 }
 function evCard(e) {
-  const L = evLoc(e);
-  return `<div class="ev-card ${e.done ? "done" : ""}" style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})"><div class="bar"></div><div class="body">
-    <div class="t">${esc(e.title)} ${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div>
-    <div class="s">${fmtTime(e.time)} · ${fmtDur(Number(e.duration) || 60)}${L ? " · " + esc(locLabel(L)) : ""}</div>
-    ${e.place ? `<div class="s">${esc(e.place)}</div>` : ""}${e.contact ? `<div class="s">Con: ${esc(e.contact)}</div>` : ""}
-    ${e.notes ? `<div class="s" style="color:var(--fg);opacity:.85;margin-top:3px">${esc(e.notes)}</div>` : ""}</div>
-    <div class="acts"><button class="icon-btn" data-toggle="${esc(e.id)}" aria-label="Cumplida">${ico("check")}</button>${L ? `<a class="icon-btn" href="${wazeUrl(L)}" target="_blank" rel="noopener" aria-label="Abrir en Waze">${ico("nav")}</a>` : ""}<button class="icon-btn" data-edit="${esc(e.id)}" aria-label="Editar">${ico("edit")}</button><button class="icon-btn" data-del="${esc(e.id)}" aria-label="Eliminar">${ico("trash")}</button></div></div>`;
+  const L = evLoc(e); const c = `var(--t-${TYPES[e.type] ? e.type : "cita"})`;
+  return `<div class="ev-card ${e.done ? "done" : ""}" style="--c:${c}">
+    <div class="top"><span class="badge ${typeC(e.type)}"><i></i>${TYPES[e.type] || "Cita"}</span>${e.done ? '<span class="badge" style="--c:var(--ok)">Cumplida</span>' : ""}${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div>
+    <div class="t">${esc(e.title)}</div>
+    <div class="s"><b style="color:var(--text)">${fmtTime(e.time)}</b> · ${fmtDur(Number(e.duration) || 60)}${L ? " · " + esc(locLabel(L)) : ""}${e.place ? "<br>" + esc(e.place) : ""}${e.contact ? "<br>Con: " + esc(e.contact) : ""}${e.notes ? `<br><span style="color:var(--text)">${esc(e.notes)}</span>` : ""}</div>
+    <div class="acts"><button class="btn sm ${e.done ? "" : "ok"}" data-toggle="${esc(e.id)}">${ico("check")}${e.done ? "Pendiente" : "Cumplida"}</button>${L ? `<a class="btn sm waze" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a>` : ""}<button class="btn sm" data-edit="${esc(e.id)}">${ico("edit")}Editar</button><button class="btn sm danger" data-del="${esc(e.id)}" aria-label="Eliminar">${ico("trash")}</button></div></div>`;
 }
 function renderUpList() {
   const t = TODAY(); const evs = sorted().filter(e => e.date >= t);
-  if (!evs.length) { $("#upList").innerHTML = `<div class="empty">No tienes compromisos de hoy en adelante.<button class="btn sm primary" data-new>${ico("plus")}Agendar algo</button></div>`; return; }
+  if (!evs.length) { $("#upList").innerHTML = `<div class="empty">${ico("agenda")}No tienes compromisos de hoy en adelante.<button class="btn sm primary" data-new>${ico("plus")}Agendar algo</button></div>`; return; }
   const groups = {}; evs.forEach(e => (groups[e.date] = groups[e.date] || []).push(e));
-  $("#upList").innerHTML = Object.entries(groups).map(([ds, list]) => { const d = parseYmd(ds); const rel = relDay(ds);
-    const dl = Math.round((d - parseYmd(t)) / 864e5);
-    return `<div class="list-group"><h3>${rel ? rel + " · " : ""}${esc(fmtDay(d))}${!rel ? ` · en ${dl} días` : ""}</h3>${list.map(evCard).join("")}</div>`; }).join("");
+  $("#upList").innerHTML = Object.entries(groups).map(([ds, list]) => { const d = parseYmd(ds); const rel = relDay(ds); const dl = Math.round((d - parseYmd(t)) / 864e5);
+    return `<div class="list-group"><div class="list-h">${rel ? rel + " · " : ""}${esc(fmtDay(d))}${!rel ? ` · en ${dl} días` : ""}</div>${list.map(evCard).join("")}</div>`; }).join("");
 }
 $("#calPrev").addEventListener("click", () => { calM = new Date(calM.getFullYear(), calM.getMonth() - 1, 1); renderAgenda(); });
 $("#calNext").addEventListener("click", () => { calM = new Date(calM.getFullYear(), calM.getMonth() + 1, 1); renderAgenda(); });
@@ -544,7 +570,7 @@ $("#dayAdd").addEventListener("click", () => { if (!isPastDay(selDay)) openEvent
 function openEventSheet(e, preset) {
   const editing = !!e; const d = Object.assign({ title: "", type: "cita", date: TODAY(), time: "09:00", duration: 60, place: "", contact: "", notes: "" }, preset || {}, e || {});
   if (!editing && isPastDay(d.date)) d.date = TODAY();
-  let muni = e ? (() => { const l = evLoc(e); return l ? (findMuni(l.name, l.dept) || null) : null; })() : (preset && preset.muni) || null;
+  let muni = e ? (() => { const l = evLoc(e); return l ? { n: l.name, d: l.dept, lat: l.lat, lon: l.lon, sub: l.sub || "" } : null; })() : (preset && preset.muni) || null;
   const minD = editing && d.date < TODAY() ? d.date : TODAY();
   const tom = parseYmd(TODAY()); tom.setDate(tom.getDate() + 1);
   const nm = parseYmd(TODAY()); nm.setDate(nm.getDate() + ((8 - nm.getDay()) % 7 || 7));
@@ -558,7 +584,7 @@ function openEventSheet(e, preset) {
       </div>
       <div class="seg" aria-label="Fechas rápidas"><button type="button" data-qd="${TODAY()}">Hoy</button><button type="button" data-qd="${ymd(tom)}">Mañana</button><button type="button" data-qd="${ymd(nm)}">Próximo lunes</button>
         <span style="flex:1"></span>${[30, 60, 120, 240].map(m => `<button type="button" data-dur="${m}" aria-pressed="${Number(d.duration) === m}">${fmtDur(m)}</button>`).join("")}</div>
-      <div class="field"><span>Municipio</span><div class="combo" id="fMuniBox"><input class="in" id="fMuni" placeholder="Busca entre los 1.122 municipios de Colombia" autocomplete="off"></div></div>
+      <div class="field"><span>¿Dónde?</span><div class="combo" id="fMuniBox"><input class="in" id="fMuni" placeholder="Municipio, pueblo, corregimiento o vereda" autocomplete="off"></div></div>
       <div id="fTrip"></div>
       <label class="field"><span>Lugar o dirección</span><input class="in" id="fPlace" placeholder="Clínica, oficina, dirección…" value="${esc(d.place)}"></label>
       <label class="field"><span>Con quién</span><input class="in" id="fContact" placeholder="Nombre o teléfono" value="${esc(d.contact)}"></label>
@@ -578,18 +604,18 @@ function openEventSheet(e, preset) {
     const draft = { date: $("#fDate").value, time: $("#fTime").value, duration: dur };
     const parts = [];
     const clash = findClash(draft, e && e.id);
-    if (clash) parts.push(`<div class="info-box warn">${ico("alerta")}<div>Se cruza con <b>${esc(clash.title)}</b> a las ${fmtTime(clash.time)}.</div></div>`);
-    if (draft.date && draft.date < TODAY()) parts.push(`<div class="info-box warn">${ico("alerta")}<div>Esa fecha ya pasó. Elige hoy o un día futuro.</div></div>`);
-    box.innerHTML = parts.join("") + (muni ? `<div class="info-box" style="margin-top:${parts.length ? 8 : 0}px">${ico("carro")}<div class="muted">Calculando trayecto…</div></div>` : "");
+    if (clash) parts.push(`<div class="info warn">${ico("alerta")}<div>Se cruza con <b>${esc(clash.title)}</b> a las ${fmtTime(clash.time)}.</div></div>`);
+    if (draft.date && draft.date < TODAY()) parts.push(`<div class="info warn">${ico("alerta")}<div>Esa fecha ya pasó. Elige hoy o un día futuro.</div></div>`);
+    box.innerHTML = parts.join("") + (muni ? `<div class="info" style="margin-top:${parts.length ? 8 : 0}px">${ico("carro")}<div class="muted">Calculando trayecto…</div></div>` : "");
     if (!muni) return;
     const from = draft.date && draft.time ? prevLocated(draft, e && e.id) : { loc: homeLoc(), ev: null };
-    const to = { name: muni.n, dept: muni.d, lat: muni.lat, lon: muni.lon };
+    const to = { name: muni.n, dept: muni.d, lat: muni.lat, lon: muni.lon, sub: muni.sub };
     routeInfo(from.loc, to).then(r => {
       if (tok !== pv || !r) return;
       let warn = "";
-      if (from.ev && draft.time && r.min) { const gap = (evStart(draft) - evEnd(from.ev)) / 6e4; if (gap < r.min) warn = `<div class="info-box warn" style="margin-top:8px">${ico("alerta")}<div>No alcanzas a llegar: necesitas ~${fmtDur(r.min)} desde <b>${esc(from.ev.title)}</b> y solo tienes ${fmtDur(Math.max(0, gap))}.</div></div>`; }
+      if (from.ev && draft.time && r.min) { const gap = (evStart(draft) - evEnd(from.ev)) / 6e4; if (gap < r.min) warn = `<div class="info warn" style="margin-top:8px">${ico("alerta")}<div>No alcanzas a llegar: necesitas ~${fmtDur(r.min)} desde <b>${esc(from.ev.title)}</b> y solo tienes ${fmtDur(Math.max(0, gap))}.</div></div>`; }
       const src = from.ev ? "Desde " + esc(from.ev.title) + " (" + esc(locLabel(from.loc)) + ")" : "Desde tu casa (" + esc(locLabel(from.loc)) + ")";
-      box.innerHTML = parts.join("") + `<div class="info-box" style="margin-top:${parts.length ? 8 : 0}px">${ico(r.src === "vuelo" ? "avion" : "carro")}<div><b>${r.src === "local" ? "Queda en el mismo municipio" : tripText(r)}</b><br><span class="muted">${src}</span></div></div>` + warn;
+      box.innerHTML = parts.join("") + `<div class="info" style="margin-top:${parts.length ? 8 : 0}px">${ico(r.src === "vuelo" ? "avion" : "carro")}<div><b>${r.src === "local" ? "Queda en el mismo municipio" : tripText(r)}</b><br><span class="muted">${src}</span></div></div>` + warn;
     });
   }
   preview();
@@ -597,7 +623,7 @@ function openEventSheet(e, preset) {
   $("#evForm").addEventListener("submit", async ev => {
     ev.preventDefault();
     const data = { title: $("#fTitle").value.trim(), type, date: $("#fDate").value, time: $("#fTime").value, duration: dur,
-      city: muni ? muni.n : "", dept: muni ? muni.d : "", lat: muni ? muni.lat : null, lon: muni ? muni.lon : null,
+      ...locOf(muni),
       place: $("#fPlace").value.trim(), contact: $("#fContact").value.trim(), notes: $("#fNotes").value.trim() };
     if (!data.title) { $("#fTitle").focus(); Sfx.play("error"); return; }
     if (!data.date || (data.date < TODAY() && !(editing && data.date === e.date)) || data.date > MAXDATE()) { toast("Elige una fecha desde hoy hasta el 31 de diciembre de " + (NOW().getFullYear() + 1) + ".", "warn", "error"); return; }
@@ -611,9 +637,9 @@ function openEventSheet(e, preset) {
   });
 }
 
-/* ───────────────────────── MAPA ───────────────────────── */
+/* ───────────────────────── MAPA (globo) ───────────────────────── */
 const monthBusy = {};
-let MAP = null, mapFailed = false, mapM = minMonth(), pendingFly = null, monthKm = {}, monthWarn = {}, mapTok = 0;
+let MAP = null, mapFailed = false, mapM = minMonth(), pendingFly = null, monthKm = {}, monthWarn = {}, mapTok = 0, WORLD = null, lastStops = [];
 function monthStops(y, m) {
   const evs = sorted().filter(e => { const d = parseYmd(e.date); return d.getFullYear() === y && d.getMonth() === m && evLoc(e); });
   const H = homeLoc(); const stops = [{ home: true, loc: H, events: [] }];
@@ -635,117 +661,105 @@ async function computeMonth(y, m) {
   monthWarn[y + "-" + m] = legs.filter(l => l.warn).map(l => l.warn);
   return { stops, legs };
 }
-function startMap() {
+async function startMap() {
   if (mapFailed) return renderMapPanel();
   if (!MAP) {
-    if (!MAPDATA) { loadGeo().then(startMap); return; }
-    try { MAP = window.CronovaMapa.create($("#mapCanvas"), $("#mapLabels"), MAPDATA); }
-    catch (e) { console.warn(e); mapFailed = true; $("#mapBox").insertAdjacentHTML("beforeend", `<div class="map-fallback">Tu dispositivo no pudo abrir el mapa 3D. El recorrido de la derecha sigue funcionando.</div>`); return renderMapPanel(); }
-    MAP.onPick = (m, at) => showMuniTip(m, at);
-    const tip = document.createElement("div"); tip.className = "mlbl"; tip.style.opacity = 0; $("#mapLabels").appendChild(tip);
-    MAP.onHoverDept = (d, e) => { if (!d || !e) { tip.style.opacity = 0; return; } const r = $("#mapCanvas").getBoundingClientRect();
-      tip.textContent = d.n; tip.style.opacity = 1; tip.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px) translate(-50%, calc(-100% - 14px))`; };
+    if (!MAPDATA) await loadGeo();
+    if (!WORLD) { try { WORLD = await (await fetch("data/mundo.json")).json(); } catch (e) { WORLD = { mundo: [], colombia: [] }; } }
+    if (MAP || current !== "mapa") return;
+    try { MAP = window.CronovaMapa.create($("#mapCanvas"), $("#mapOver"), MAPDATA, WORLD); }
+    catch (e) { console.warn(e); mapFailed = true; $("#mapBox").insertAdjacentHTML("beforeend", `<div class="map-fallback">Tu dispositivo no pudo abrir el globo 3D. El recorrido de la derecha sigue funcionando.</div>`); return renderMapPanel(); }
+    MAP.onPick = (ll, at) => { if (!ll) return closeTip(); const near = nearestPlace(ll); if (!near || near.d > 30) return closeTip(); showTip(near.p, at); };
+    MAP.onPin = s => { if (s.home) { const h = homeLoc(); const at = MAP.screenOf(h.lat, h.lon); showTip({ n: h.name, d: h.dept, lat: h.lat, lon: h.lon }, at, true); return; }
+      const st = lastStops.find(x => !x.home && x.loc.lat === s.lat && x.loc.lon === s.lon); const at = MAP.screenOf(s.lat, s.lon);
+      showTip({ n: s.label, d: st ? st.loc.dept : "", lat: s.lat, lon: s.lon }, at, false, st ? st.events : []); };
     MAP.setHome(homeLoc());
-    $("#mzIn").onclick = () => MAP.zoom(.7); $("#mzOut").onclick = () => MAP.zoom(1.4);
-    $("#mTilt").onclick = () => { const t = MAP.toggleTilt(); $("#mTilt").classList.toggle("on", !t); };
-    $("#mHome").onclick = () => { const h = homeLoc(); MAP.flyTo(h.lat, h.lon, 3); };
+    $("#mzIn").onclick = () => MAP.zoom(.6); $("#mzOut").onclick = () => MAP.zoom(1.6);
+    const setV = v => { $("#mvCol").setAttribute("aria-pressed", v === "colombia"); $("#mvMundo").setAttribute("aria-pressed", v === "mundo"); MAP.view(v); closeTip(); };
+    $("#mvCol").onclick = () => setV("colombia"); $("#mvMundo").onclick = () => setV("mundo");
+    $("#mHome").onclick = () => { const h = homeLoc(); MAP.flyTo(h.lat, h.lon, 1.5); };
     $("#mFit").onclick = () => fitMonth();
-    makeCombo($("#mapSearchBox"), $("#mapSearch"), m => { MAP.flyTo(m.lat, m.lon, 2.6); MAP.selectMuni(m.raw); setTimeout(() => { const p = MAP.screenOf(m.lat, m.lon); showMuniTip(m.raw, p); }, reduceMotion() ? 20 : 900); });
-    if (matchMedia("(pointer: coarse)").matches) $("#mapHint").textContent = "Arrastra para moverte · pellizca para acercar · gira con dos dedos";
-    $("#mapCanvas").addEventListener("pointerdown", () => { setTimeout(() => $("#mapHint").hidden = true, 2500); }, { once: true });
+    makeCombo($("#mapSearchBox"), $("#mapSearch"), p => { MAP.flyTo(p.lat, p.lon, 1.4); setTimeout(() => showTip(p, MAP.screenOf(p.lat, p.lon)), reduceMotion() ? 30 : 950); });
     MAP.start(); renderMapPanel(true); return;
   }
   MAP.start(); renderMapPanel();
 }
+function nearestPlace(ll) { let best = null, bd = Infinity; allPlaces().forEach(p => { const d = hav(ll, p); if (d < bd) { bd = d; best = p; } }); return best ? { p: best, d: bd } : null; }
+function fitMonth() { const st = monthStops(mapM.getFullYear(), mapM.getMonth()); if (st.length) MAP.fit(st.map(s => s.loc)); else MAP.view("colombia"); }
 let lastFitKey = "";
-function fitMonth() {
-  const stops = monthStops(mapM.getFullYear(), mapM.getMonth());
-  if (stops.length) MAP.fitPoints(stops.map(s => s.loc)); else MAP.home();
-}
 function renderMapPanel(first) {
   if (mapM < minMonth()) mapM = minMonth(); if (mapM > maxMonth()) mapM = maxMonth();
   $("#mapMonth").textContent = MONTHS[mapM.getMonth()] + " " + mapM.getFullYear();
   $("#mapPrev").disabled = mapM <= minMonth(); $("#mapNext").disabled = mapM >= maxMonth();
   const H = homeLoc();
-  $("#homeRow").innerHTML = `${ico("casa")}<div class="x"><b>Tu casa</b><br><span class="muted">${esc(locLabel(H))}</span></div><button class="btn sm" id="homeChange">Cambiar</button>`;
+  $("#homeRow").innerHTML = `${ico("casa")}<div class="x"><b>Tu casa</b> · <span class="muted">${esc(locLabel(H))}</span></div><button class="btn sm" id="homeChange">Cambiar</button>`;
   $("#homeChange").onclick = openHomeSheet;
   const y = mapM.getFullYear(), m = mapM.getMonth(), tok = ++mapTok;
-  const stops = monthStops(y, m);
+  const stops = monthStops(y, m); lastStops = stops;
   if (!stops.length) {
-    $("#routeSum").innerHTML = ""; $("#legs").innerHTML = `<div class="empty">No tienes citas fuera de casa en ${MONTHS[m]}.<span class="dim" style="font-size:.8rem">Cuando agendes una cita con municipio, el recorrido aparece aquí y en el mapa.</span><button class="btn sm primary" data-new>${ico("plus")}Agendar con municipio</button></div>`;
-    if (MAP) { MAP.setRoute([], []); if (first || pendingFly) { if (pendingFly) MAP.flyTo(pendingFly.lat, pendingFly.lon, 3); pendingFly = null; } }
+    $("#routeTotal").innerHTML = ""; $("#legs").innerHTML = `<div class="empty">${ico("ruta")}No tienes salidas fuera de casa en ${MONTHS[m]}.<span style="font-size:.84rem">Cuando agendes una cita en otro municipio, aparece aquí.</span></div>`;
+    if (MAP) { MAP.setRoute([], []); if (pendingFly) { MAP.flyTo(pendingFly.lat, pendingFly.lon, 1.6); pendingFly = null; } }
     return;
   }
-  $("#routeSum").innerHTML = `<div><b>—</b><span>Km</span></div><div><b>—</b><span>Al volante</span></div><div><b>${stops.filter(s => !s.home).length}</b><span>Paradas</span></div>`;
-  $("#legs").innerHTML = `<div class="muted" style="font-size:.86rem">Calculando el recorrido por carretera…</div>`;
+  $("#routeTotal").innerHTML = `<span>Calculando…</span>`;
   computeMonth(y, m).then(({ legs }) => {
     if (tok !== mapTok) return;
-    const km = legs.reduce((s, l) => s + (l.r ? l.r.km : 0), 0), min = legs.reduce((s, l) => s + (l.r ? l.r.min : 0), 0);
-    $("#routeSum").innerHTML = `<div><b>${fmtKm(km)}</b><span>Km</span></div><div><b>${fmtDur(min)}</b><span>En camino</span></div><div><b>${stops.filter(s => !s.home).length}</b><span>Paradas</span></div>`;
-    let n = 0;
+    const km = legs.reduce((s, l) => s + (l.r ? l.r.km : 0), 0), min = legs.reduce((s, l) => s + (l.r ? l.r.min : 0), 0), n = stops.filter(s => !s.home).length;
+    $("#routeTotal").innerHTML = `<b>${fmtKm(km)}</b><span>${fmtDur(min)} en camino · ${n} ${n === 1 ? "parada" : "paradas"}</span>`;
+    let k = 0;
     $("#legs").innerHTML = stops.map((s, i) => {
-      const lg = legs[i - 1];
-      const head = s.home ? (s.ret ? "Regreso a casa" : "Sales de casa") : esc(s.loc.name);
-      const move = lg ? `<div class="move">${ico(lg.r && lg.r.src === "vuelo" ? "avion" : "carro").replace("<svg", '<svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.9"')}${esc(tripText(lg.r))}<a class="waze" href="${wazeUrl(s.loc)}" target="_blank" rel="noopener">${ico("nav").replace("<svg", '<svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.2"')}Waze</a>${lg.r && lg.r.src === "aprox" ? '<span class="src">estimado</span>' : ""}</div>` : "";
-      return `<div class="leg"><div class="num ${s.home ? "home" : ""}">${s.home ? "⌂" : ++n}</div><div style="min-width:0">${move}<div class="city">${head}</div>
-        ${s.home ? `<div class="ev">${esc(locLabel(s.loc))}</div>` : s.events.map(e => `<div class="ev">${esc(fmtShort(evStart(e)))} · ${fmtTime(e.time)} — ${esc(e.title)}</div>`).join("")}
-        ${lg && lg.warn ? `<div class="warn">⚠ ${esc(lg.warn)}</div>` : ""}</div></div>`;
+      if (i === 0) return "";
+      const lg = legs[i - 1]; const label = s.home ? "Regreso a casa" : s.loc.name;
+      const when = s.events.length ? esc(fmtShort(evStart(s.events[0]))) + (s.events[0].time ? " · " + fmtTime(s.events[0].time) : "") : esc(locLabel(s.loc));
+      return `<div class="leg"><span class="n ${s.home ? "h" : ""}">${s.home ? "⌂" : ++k}</span><div style="min-width:0"><div class="c">${esc(label)}</div><div class="m">${when}<br>${esc(tripText(lg.r))}${lg.r && lg.r.src === "aprox" ? " (estimado)" : ""}</div>${lg.warn ? `<div class="w">${esc(lg.warn)}</div>` : ""}</div><a class="wz" href="${wazeUrl(s.loc)}" target="_blank" rel="noopener">${ico("nav")}Waze</a></div>`;
     }).join("");
     if (MAP) {
-      let k = 0;
-      MAP.setRoute(stops.map(s => ({ lat: s.loc.lat, lon: s.loc.lon, label: s.loc.name, home: s.home, num: s.home ? "" : ++k })),
-        legs.map(l => ({ a: l.a.loc, b: l.b.loc, geom: l.r ? l.r.geom : null, mode: l.r && l.r.src === "vuelo" ? "vuelo" : "carretera" })));
+      let j = 0;
+      MAP.setRoute(stops.map(s => ({ lat: s.loc.lat, lon: s.loc.lon, label: s.loc.name, home: s.home, num: s.home ? "" : ++j })), legs.map(l => ({ a: l.a.loc, b: l.b.loc })));
       const fk = y + "-" + m;
-      if (pendingFly) { MAP.flyTo(pendingFly.lat, pendingFly.lon, 3); pendingFly = null; }
+      if (pendingFly) { MAP.flyTo(pendingFly.lat, pendingFly.lon, 1.6); pendingFly = null; }
       else if (first || lastFitKey !== fk) fitMonth();
       lastFitKey = fk;
     }
-    if (current === "inicio") renderInicio();
   });
 }
 $("#mapPrev").addEventListener("click", () => { mapM = new Date(mapM.getFullYear(), mapM.getMonth() - 1, 1); renderMapPanel(); });
 $("#mapNext").addEventListener("click", () => { mapM = new Date(mapM.getFullYear(), mapM.getMonth() + 1, 1); renderMapPanel(); });
 let tipEl = null;
-function showMuniTip(raw, at) {
-  if (tipEl) { tipEl.remove(); tipEl = null; }
-  if (!raw) return;
-  const m = MUN.find(x => x.raw === raw) || null; if (!m) return;
-  const H = homeLoc(); const L = { name: m.n, dept: m.d, lat: m.lat, lon: m.lon };
+function closeTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
+function showTip(p, at, isHomePin, events) {
+  closeTip(); if (!p || !at) return;
+  const H = homeLoc(); const L = { name: p.n, dept: p.d, lat: p.lat, lon: p.lon, sub: p.sub };
   const box = $("#mapBox"); const bw = box.clientWidth, bh = box.clientHeight;
   tipEl = document.createElement("div"); tipEl.className = "map-tip";
-  const x = Math.max(12, Math.min(bw - 262, at.x - 125)), y = Math.max(60, Math.min(bh - 200, at.y - 190));
-  tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
-  const isHome = sameLoc(L, H);
-  tipEl.innerHTML = `<div class="t">${esc(m.n)}</div><div class="s">${esc(DEPT[m.d] || "")}${m.cap ? " · capital" : ""}<br><span id="tipTrip">${isHome ? "Aquí está tu casa" : "Calculando desde tu casa…"}</span></div>
-    <div class="acts"><button class="btn sm primary" id="tipNew">${ico("plus")}Cita aquí</button>${isHome ? "" : `<button class="btn sm" id="tipHome">${ico("casa")}Es mi casa</button>`}<a class="btn sm" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a></div>`;
+  tipEl.style.left = Math.max(12, Math.min(bw - 252, at.x - 120)) + "px"; tipEl.style.top = Math.max(60, Math.min(bh - 190, at.y - 175)) + "px";
+  const isHome = isHomePin || sameLoc(L, H);
+  tipEl.innerHTML = `<div class="t">${esc(p.n)}</div><div class="s">${esc(placeSub(p))}${events && events.length ? "<br>" + events.map(e => esc(fmtShort(evStart(e)) + " · " + e.title)).join("<br>") : ""}<br><span id="tipTrip">${isHome ? "Aquí está tu casa" : "Calculando desde tu casa…"}</span></div>
+    <div class="acts"><button class="btn sm primary" id="tipNew">${ico("plus")}Cita aquí</button>${isHome ? "" : `<button class="btn sm" id="tipHome">${ico("casa")}Es mi casa</button>`}<a class="btn sm waze" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a></div>`;
   box.appendChild(tipEl);
-  $("#tipNew").onclick = () => { openEventSheet(null, { muni: m }); };
-  if (!isHome) {
-    $("#tipHome").onclick = () => { setHome(L); tipEl.remove(); tipEl = null; };
-    routeInfo(H, L).then(r => { const t = $("#tipTrip"); if (t && r) t.textContent = "Desde tu casa: " + tripText(r); });
-  }
+  $("#tipNew").onclick = () => openEventSheet(null, { muni: p });
+  if (!isHome) { $("#tipHome").onclick = () => { setHome(L); closeTip(); }; routeInfo(H, L).then(r => { const t = $("#tipTrip"); if (t && r) t.textContent = "Desde tu casa: " + tripText(r); }); }
 }
 function setHome(L, exact) {
-  savePrefs({ home: { name: L.name, dept: L.dept, lat: L.lat, lon: L.lon, exacta: !!exact } }, true);
+  savePrefs({ home: { name: L.name, dept: L.dept, lat: L.lat, lon: L.lon, sub: L.sub || "", exacta: !!exact } }, true);
   if (MAP) MAP.setHome(homeLoc());
-  nextTripFor = ""; renderAll(); toast("Tu casa ahora es " + locLabel(L) + ".", "ok", "casa");
+  nextTripFor = ""; monthKm = {}; monthWarn = {}; renderAll(); toast("Tu casa ahora es " + locLabel(homeLoc()) + ".", "ok", "casa");
 }
 function openHomeSheet() {
-  const sh = openSheet(`<div class="sheet-h"><div><div class="eyebrow">Home</div><h2>¿Dónde vives?</h2></div><button class="icon-btn" data-close aria-label="Cerrar">${ico("x")}</button></div>
-    <p class="muted" style="margin:0;font-size:.88rem">Desde aquí calculo tus recorridos, los kilómetros y a qué hora salir.</p>
-    <div class="combo" id="hBox"><input class="in" id="hIn" placeholder="Busca tu municipio o pueblo" autocomplete="off" autofocus></div>
+  openSheet(`<div class="sheet-h"><div><div class="eyebrow">Tu casa</div><h2>¿Dónde vives?</h2></div><button class="icon-btn" data-close aria-label="Cerrar">${ico("x")}</button></div>
+    <p class="muted" style="margin:0">Desde aquí calculo tus recorridos, los kilómetros y a qué hora salir.</p>
+    <div class="combo" id="hBox"><input class="in" id="hIn" placeholder="Municipio, pueblo, corregimiento o vereda" autocomplete="off" autofocus></div>
     <button class="btn" id="hGps">${ico("gps")}Usar mi ubicación actual</button>
-    <div id="hMsg" class="muted" style="font-size:.84rem"></div>`, { label: "Elegir casa" });
-  makeCombo($("#hBox"), $("#hIn"), m => { closeSheet(); setHome({ name: m.n, dept: m.d, lat: m.lat, lon: m.lon }); if (MAP) MAP.flyTo(m.lat, m.lon, 3); });
+    <div id="hMsg" class="muted" style="font-size:.86rem"></div>`, { label: "Elegir casa" });
+  makeCombo($("#hBox"), $("#hIn"), p => { closeSheet(); setHome({ name: p.n, dept: p.d, lat: p.lat, lon: p.lon, sub: p.sub }); if (MAP) MAP.flyTo(p.lat, p.lon, 1.4); });
   $("#hGps").onclick = () => {
     if (!navigator.geolocation) { $("#hMsg").textContent = "Este navegador no permite leer la ubicación."; return; }
     $("#hMsg").textContent = "Buscando tu ubicación…";
-    navigator.geolocation.getCurrentPosition(p => {
-      const lat = p.coords.latitude, lon = p.coords.longitude; let best = null, bd = Infinity;
-      MUN.forEach(m => { const d = hav({ lat, lon }, m); if (d < bd) { bd = d; best = m; } });
-      if (!best || bd > 80) { $("#hMsg").textContent = "Parece que no estás en Colombia. Busca tu municipio arriba."; return; }
-      closeSheet(); setHome({ name: best.n, dept: best.d, lat, lon }, true); if (MAP) MAP.flyTo(lat, lon, 2.4);
-    }, () => { $("#hMsg").textContent = "No diste permiso de ubicación. Busca tu municipio arriba."; Sfx.play("error"); }, { enableHighAccuracy: true, timeout: 12000 });
+    navigator.geolocation.getCurrentPosition(pos => {
+      const ll = { lat: pos.coords.latitude, lon: pos.coords.longitude }; const near = nearestPlace(ll);
+      if (!near || near.d > 80) { $("#hMsg").textContent = "Parece que no estás en Colombia. Busca tu lugar arriba."; return; }
+      closeSheet(); setHome({ name: near.p.n, dept: near.p.d, lat: ll.lat, lon: ll.lon, sub: near.p.sub }, true); if (MAP) MAP.flyTo(ll.lat, ll.lon, 1.4);
+    }, () => { $("#hMsg").textContent = "No diste permiso de ubicación. Busca tu lugar arriba."; Sfx.play("error"); }, { enableHighAccuracy: true, timeout: 12000 });
   };
 }
 
@@ -787,14 +801,14 @@ function rules() {
   const n = NOW(); const H = homeLoc();
   return `Eres CRONOVA, el asistente personal de agenda de ${PREFS.nombre}. Llámalo "${PREFS.nombre}". Responde siempre en español de Colombia, claro, cálido y breve.
 Fecha y hora actual: ${fmtDayY(n)}, ${fmtClock(n)} ${n.getHours() >= 12 ? "p. m." : "a. m."} (ISO ${TODAY()}). Semana de lunes a domingo.
-Su casa queda en ${locLabel(H)}.
+Su casa queda en ${locLabel(H)}. Lugares que usa seguido (además de los 1.122 municipios): ${(PREFS.lugares || []).map(p => p.n + (p.sub ? " (" + p.sub + ")" : "")).join(", ") || "ninguno"}.
 Puedes leer, crear, editar y borrar eventos, buscar huecos libres, calcular trayectos entre municipios y preparar llamadas.
 Reglas:
 - Solo se puede agendar desde hoy (${TODAY()}) hasta el ${MAXDATE()}. Nunca agendes en fechas pasadas: si lo piden, dilo y propone una fecha válida.
 - Antes de crear un evento, revisa la agenda de ese día para detectar cruces; si hay cruce, avisa y propone otra hora.
 - Convierte fechas relativas ("el jueves", "mañana", "en 15 días") a fechas exactas YYYY-MM-DD y horas HH:MM de 24 h.
 - Tipos válidos: cita, compromiso, viaje, llamada, personal.
-- Para el lugar usa el nombre del municipio colombiano (cualquier municipio o pueblo, no solo capitales). Si es fuera de su casa, calcula el trayecto con route_info y dile a qué hora salir.
+- Para el lugar usa el nombre del municipio o pueblo colombiano (incluye corregimientos guardados como Doradal). Si es fuera de su casa, calcula el trayecto con route_info y dile a qué hora salir.
 - Para "llama a alguien para agendar" usa schedule_call: tú no marcas todavía, pero dejas la llamada preparada con guion.
 - Después de usar herramientas, confirma en 1 a 3 frases qué hiciste, con fecha y hora legibles.`;
 }
@@ -810,7 +824,7 @@ const TOOLS = [
       if (date > MAXDATE()) throw new Error("Solo se agenda hasta " + MAXDATE());
       let m = null; if (i.municipio) { const dc = i.departamento ? Object.keys(DEPT).find(c => norm(DEPT[c]) === norm(i.departamento)) : null; m = findMuni(String(i.municipio), dc); if (!m) throw new Error("No encontré el municipio " + i.municipio); }
       const d = { title: String(i.title), type: TYPES[i.type] ? String(i.type) : "cita", date, time: i.time ? String(i.time) : "", duration: Number(i.duration) || 60,
-        city: m ? m.n : "", dept: m ? m.d : "", lat: m ? m.lat : null, lon: m ? m.lon : null, place: String(i.place || ""), contact: String(i.contact || ""), notes: String(i.notes || ""), done: false };
+        ...locOf(m), place: String(i.place || ""), contact: String(i.contact || ""), notes: String(i.notes || ""), done: false };
       const clash = findClash(d); const id = await addDoc("events", d); Sfx.play("guardar");
       toolNote("Agendé: " + d.title + " · " + fmtShort(parseYmd(d.date)) + (d.time ? " " + d.time : "") + (m ? " · " + m.n : ""));
       return { id, municipio: m ? muniLabel(m) : "", clash: clash ? { title: clash.title, time: clash.time } : null };
@@ -821,7 +835,7 @@ const TOOLS = [
       const p = {}; ["title", "type", "date", "time", "place", "contact", "notes"].forEach(k => { if (i[k] != null) p[k] = String(i[k]); });
       if (p.date && (p.date < TODAY() || p.date > MAXDATE())) throw new Error("Fecha fuera del rango permitido");
       if (i.duration != null) p.duration = Number(i.duration); if (i.done != null) p.done = !!i.done;
-      if (i.municipio) { const m = findMuni(String(i.municipio)); if (!m) throw new Error("No encontré ese municipio"); Object.assign(p, { city: m.n, dept: m.d, lat: m.lat, lon: m.lon }); }
+      if (i.municipio) { const m = findMuni(String(i.municipio)); if (!m) throw new Error("No encontré ese municipio"); Object.assign(p, locOf(m)); }
       await updDoc("events", id, p); toolNote("Actualicé un evento"); return "ok"; } },
   { name: "delete_event", description: "Elimina un evento por id. Úsalo solo cuando el usuario lo pida explícitamente. Devuelve ok.",
     inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
@@ -837,7 +851,7 @@ const TOOLS = [
   { name: "schedule_call", description: "Prepara una llamada para agendar una cita: guarda nombre, teléfono, objetivo y disponibilidad, y genera el guion. Devuelve el id.",
     inputSchema: { type: "object", properties: { name: { type: "string" }, phone: { type: "string" }, goal: { type: "string" }, window: { type: "string" }, municipio: { type: "string" } }, required: ["name", "goal"] },
     async execute(i) { const m = i.municipio ? findMuni(String(i.municipio)) : null;
-      const id = await createCall({ name: String(i.name), phone: String(i.phone || ""), goal: String(i.goal), window: String(i.window || ""), city: m ? m.n : "", dept: m ? m.d : "", lat: m ? m.lat : null, lon: m ? m.lon : null });
+      const id = await createCall({ name: String(i.name), phone: String(i.phone || ""), goal: String(i.goal), window: String(i.window || ""), ...locOf(m) });
       toolNote("Preparé la llamada a " + i.name); return { id }; } }
 ];
 async function agent(system, msgs, signal) {
@@ -857,11 +871,11 @@ async function agent(system, msgs, signal) {
 
 /* Chat */
 let turns = [], busy = false, ctl = null, chatLog = [];
-const SUGS = ["¿Qué tengo esta semana?", "Agéndame almuerzo con Laura el viernes a la 1 pm", "¿Cuánto me demoro de mi casa a Villa de Leyva?", "Llama al consultorio para una cita la próxima semana"];
+const SUGS = ["¿Qué tengo esta semana?", "Agéndame almuerzo con Laura el viernes a la 1 pm", "¿Cuánto me demoro de mi casa a Doradal?", "Llama al consultorio para una cita la próxima semana"];
 function renderChat() {
   const box = $("#msgs");
   if (!chatLog.length) {
-    box.innerHTML = `<div class="ai-hello"><svg class="logo" viewBox="0 0 64 64"><use href="#logo"/></svg><h2>${greetWord(NOW())}, ${esc(PREFS.nombre)}</h2>
+    box.innerHTML = `<div class="ai-hello"><span class="tile"><svg viewBox="0 0 64 64"><use href="#logo-w"/></svg></span><h2>${greetWord(NOW())}, ${esc(PREFS.nombre)}</h2>
       <p class="muted" style="margin:0">Dime en tus palabras qué necesitas: agendar, mover o cancelar citas, saber cuánto te demoras a un municipio o preparar una llamada.</p>
       <div class="sugs">${SUGS.map(s => `<button class="sug" type="button">${esc(s)}</button>`).join("")}</div></div>`;
   } else box.innerHTML = chatLog.map(m => `<div class="msg ${m.k}">${esc(m.t)}</div>`).join("");
@@ -940,7 +954,7 @@ makeCombo($("#cMuniBox"), $("#cMuni"), m => { callMuni = m; });
 $("#callForm").addEventListener("submit", async e => {
   e.preventDefault();
   const c = { name: $("#cName").value.trim(), phone: $("#cPhone").value.trim(), goal: $("#cGoal").value.trim(), window: $("#cWindow").value.trim(),
-    city: callMuni ? callMuni.n : "", dept: callMuni ? callMuni.d : "", lat: callMuni ? callMuni.lat : null, lon: callMuni ? callMuni.lon : null };
+    ...locOf(callMuni) };
   if (!c.name || !c.goal) return;
   try { await createCall(c); $("#callForm").reset(); callMuni = null; toast("Llamada en cola. Estoy escribiendo el guion.", "ok", "guardar"); } catch (_) { toast("No se pudo guardar la llamada.", "bad", "error"); }
 });
@@ -971,7 +985,7 @@ $("#calls").addEventListener("submit", async e => {
   const c = S.calls.find(x => x.id === f.dataset.resolve); if (!c) return;
   if (f.d.value < TODAY()) { toast("Esa fecha ya pasó.", "warn", "error"); return; }
   const ev = { title: c.goal.replace(/^agendar\s*/i, "").replace(/^./, m => m.toUpperCase()) + " · " + c.name, type: "cita", date: f.d.value, time: f.t.value, duration: 60,
-    city: c.city || "", dept: c.dept || "", lat: c.lat ?? null, lon: c.lon ?? null, place: f.p.value.trim(), contact: c.name + (c.phone ? " " + c.phone : ""), notes: "Agendada por llamada", done: false };
+    city: c.city || "", dept: c.dept || "", lat: c.lat ?? null, lon: c.lon ?? null, sub: c.sub || "", place: f.p.value.trim(), contact: c.name + (c.phone ? " " + c.phone : ""), notes: "Agendada por llamada", done: false };
   await addDoc("events", ev); await updDoc("calls", c.id, { status: "ok", result: ev.date + " " + ev.time });
   resolving = null; toast("Cita creada: " + fmtShort(parseYmd(ev.date)) + " · " + fmtTime(ev.time), "ok", "guardar");
 });
@@ -1009,69 +1023,75 @@ function renderFound() {
 }
 $("#found").addEventListener("click", async e => {
   const b = e.target.closest("[data-addfound]"); if (!b) return; const x = found[+b.dataset.addfound]; const m = x.municipio ? findMuni(x.municipio) : null;
-  await addDoc("events", { title: String(x.title), type: TYPES[x.type] ? x.type : "compromiso", date: x.date, time: x.time || "", duration: 60, city: m ? m.n : "", dept: m ? m.d : "", lat: m ? m.lat : null, lon: m ? m.lon : null, place: "", contact: String(x.source || ""), notes: "Detectado en correo", done: false });
+  await addDoc("events", { title: String(x.title), type: TYPES[x.type] ? x.type : "compromiso", date: x.date, time: x.time || "", duration: 60, ...locOf(m), place: "", contact: String(x.source || ""), notes: "Detectado en correo", done: false });
   x.added = true; renderFound(); toast("Agregado al calendario.", "ok", "guardar");
 });
 
 /* ───────────────────────── AJUSTES ───────────────────────── */
-const THEMES = [["nova", "Nova", ["#06071A", "#8B7CFF", "#63E6FF", "#FFB86B"]], ["esmeralda", "Esmeralda y oro", ["#03100B", "#1FBF8F", "#7BE0C0", "#E3C27A"]],
-  ["grafito", "Grafito y cobre", ["#0C0D0F", "#D98A4E", "#8FB8C9", "#E8C07A"]], ["claro", "Claro profesional", ["#F3F4F9", "#2457F5", "#12B886", "#E8890C"]]];
-const FONTS = [["moderna", "Moderna", "Sora + Inter", "'Sora'"], ["tecnica", "Técnica", "Space Grotesk + IBM Plex", "'Space Grotesk'"], ["clasica", "Clásica", "Plus Jakarta Sans", "'Plus Jakarta Sans'"]];
+const FONTS = [["jakarta", "Jakarta", "La misma de Traspasos", "'Plus Jakarta Sans'"], ["moderna", "Moderna", "Sora + Inter", "'Sora'"], ["tecnica", "Técnica", "Space Grotesk + IBM Plex", "'Space Grotesk'"]];
+function swatchesHTML(big) { return `<div class="swatches ${big ? "big" : ""}">${Object.entries(COLORS).map(([k, c]) => `<button type="button" class="swatch" data-color="${k}" aria-pressed="${PREFS.color === k}" style="--a:${c[0]};--b:${c[1]}"><i>${PREFS.color === k ? ico("check") : ""}</i>${c[2]}</button>`).join("")}</div>`; }
+function bindSwatches(root) { root.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { savePrefs({ color: b.dataset.color }); Sfx.play("toque"); if (!$("#colorPop").hidden) $("#swatchesPop").innerHTML = swatchesHTML(), bindSwatches($("#swatchesPop")); }); }
+$("#colorBtn").addEventListener("click", e => { e.stopPropagation(); const p = $("#colorPop"); p.hidden = !p.hidden; if (!p.hidden) { $("#swatchesPop").innerHTML = swatchesHTML(); bindSwatches($("#swatchesPop")); Sfx.play("abrir"); } });
+document.addEventListener("click", e => { const p = $("#colorPop"); if (!p.hidden && !p.contains(e.target) && e.target !== $("#colorBtn")) p.hidden = true; });
 function renderSettings() {
   const H = homeLoc(); const em = session && session.user ? session.user.email : "";
   const sw = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? "checked" : ""}><span></span></label>`;
+  const lug = PREFS.lugares || [];
   $("#settings").innerHTML = `
-  <div class="card set-sec" id="s-perfil"><div class="card-h"><h2>Perfil y casa</h2></div>
+  <div class="card set-sec" id="s-perfil"><div class="card-h"><div class="sec-t">Perfil y lugares</div></div>
     <div class="set-row"><div class="l"><b>¿Cómo te llamo?</b><span>Aparece en el saludo y la IA te llama así.</span></div><div class="r"><input class="in" id="pName" value="${esc(PREFS.nombre)}" style="width:230px" maxlength="40"></div></div>
-    <div class="set-row"><div class="l"><b>Tu casa (Home)</b><span>${esc(locLabel(H))}${H.exacta ? " · ubicación exacta" : ""}</span></div><div class="r"><button class="btn sm" id="pHome">${ico("casa")}Cambiar casa</button></div></div>
+    <div class="set-row"><div class="l"><b>Tu casa</b><span>${esc(locLabel(H))}${H.exacta ? " · ubicación exacta" : ""}</span></div><div class="r"><button class="btn sm" id="pHome">${ico("casa")}Cambiar casa</button></div></div>
+    <div class="set-row" style="align-items:flex-start"><div class="l"><b>Lugares guardados</b><span>Pueblos, corregimientos y veredas que usas seguido.</span>
+      <div class="places" style="margin-top:10px">${lug.length ? lug.map((p, i) => `<span class="place">${esc(p.n)}${p.sub ? ` <span class="dim">· ${esc(p.sub)}</span>` : ""}<button type="button" data-rmplace="${i}" aria-label="Quitar ${esc(p.n)}">${ico("x")}</button></span>`).join("") : '<span class="dim">Aún no tienes lugares guardados.</span>'}</div></div>
+      <div class="r" style="width:min(300px,100%)"><div class="combo" id="pPlaceBox" style="width:100%"><input class="in" id="pPlace" placeholder="Agregar un lugar…" autocomplete="off"></div></div></div>
   </div>
-  <div class="card set-sec" id="s-apariencia"><div class="card-h"><h2>Colores</h2></div>
-    <div class="themes">${THEMES.map(([k, n, c]) => `<button type="button" class="theme" data-tema="${k}" aria-pressed="${PREFS.tema === k}"><div class="sw">${c.map(x => `<i style="background:${x}"></i>`).join("")}</div><b>${n}</b></button>`).join("")}</div>
-  </div>
-  <div class="card set-sec" id="s-tipo"><div class="card-h"><h2>Tipografía</h2></div>
+  <div class="card set-sec" id="s-apariencia"><div class="card-h"><div class="sec-t">Color</div></div>${swatchesHTML(true)}</div>
+  <div class="card set-sec" id="s-tipo"><div class="card-h"><div class="sec-t">Tipografía</div></div>
     <div class="fonts">${FONTS.map(([k, n, d, f]) => `<button type="button" class="font-opt" data-fuente="${k}" aria-pressed="${PREFS.fuente === k}"><div class="aa" style="font-family:${f},sans-serif">Aa ${n}</div><span>${d}</span></button>`).join("")}</div>
-    <div class="set-row" style="margin-top:8px"><div class="l"><b>Tamaño del texto</b><span>Más grande se lee mejor en el iPhone.</span></div><div class="r"><div class="seg solid"><button type="button" data-texto="normal" aria-pressed="${PREFS.texto === "normal"}">Normal</button><button type="button" data-texto="grande" aria-pressed="${PREFS.texto === "grande"}">Grande</button></div></div></div>
+    <div class="set-row" style="margin-top:10px"><div class="l"><b>Tamaño del texto</b><span>Más grande se lee mejor en el iPhone.</span></div><div class="r"><div class="seg"><button type="button" data-texto="normal" aria-pressed="${PREFS.texto === "normal"}">Normal</button><button type="button" data-texto="grande" aria-pressed="${PREFS.texto === "grande"}">Grande</button></div></div></div>
   </div>
-  <div class="card set-sec" id="s-sonido"><div class="card-h"><h2>Sonidos y animación</h2></div>
+  <div class="card set-sec" id="s-sonido"><div class="card-h"><div class="sec-t">Sonidos y animación</div></div>
     <div class="set-row"><div class="l"><b>Sonidos de acciones</b><span>Al guardar, completar, borrar, recibir respuestas y alertas.</span></div><div class="r">${sw("pSnd", PREFS.sonido)}</div></div>
-    <div class="set-row"><div class="l"><b>Volumen</b></div><div class="r" style="min-width:220px"><input type="range" id="pVol" min="0" max="1" step="0.05" value="${PREFS.volumen}"><button class="btn sm" id="pTest">${ico("sonido")}Probar</button></div></div>
-    <div class="set-row"><div class="l"><b>Animaciones</b><span>Reducidas: todo aparece al instante.</span></div><div class="r"><div class="seg solid"><button type="button" data-anim="completas" aria-pressed="${PREFS.anim === "completas"}">Completas</button><button type="button" data-anim="reducidas" aria-pressed="${PREFS.anim === "reducidas"}">Reducidas</button></div></div></div>
+    <div class="set-row"><div class="l"><b>Volumen</b></div><div class="r" style="min-width:230px"><input type="range" id="pVol" min="0" max="1" step="0.05" value="${PREFS.volumen}"><button class="btn sm" id="pTest">${ico("sonido")}Probar</button></div></div>
+    <div class="set-row"><div class="l"><b>Animaciones</b><span>Reducidas: todo aparece al instante.</span></div><div class="r"><div class="seg"><button type="button" data-anim="completas" aria-pressed="${PREFS.anim === "completas"}">Completas</button><button type="button" data-anim="reducidas" aria-pressed="${PREFS.anim === "reducidas"}">Reducidas</button></div></div></div>
   </div>
-  <div class="card set-sec" id="s-avisos"><div class="card-h"><h2>Recordatorios</h2></div>
+  <div class="card set-sec" id="s-avisos"><div class="card-h"><div class="sec-t">Recordatorios</div></div>
     <div class="set-row"><div class="l"><b>Aviso 1 hora antes</b></div><div class="r">${sw("pA60", PREFS.aviso60)}</div></div>
     <div class="set-row"><div class="l"><b>Aviso 15 minutos antes</b></div><div class="r">${sw("pA15", PREFS.aviso15)}</div></div>
     <div class="set-row"><div class="l"><b>Avisos del sistema</b><span>Notificación del Mac o del iPhone mientras CRONOVA está abierta.</span></div><div class="r">${sw("pSys", PREFS.avisoSistema)}</div></div>
   </div>
-  <div class="card set-sec" id="s-nube"><div class="card-h"><h2>Nube</h2><span class="chip" style="--c:${S.mode === "db" ? "var(--ok)" : "var(--warn)"}"><i></i>${S.mode === "db" ? "Conectada" : "Sin conexión"}</span></div>
+  <div class="card set-sec" id="s-nube"><div class="card-h"><div class="sec-t">Nube</div><span class="badge" style="--c:${S.mode === "db" ? "var(--ok)" : "var(--warn)"}"><i></i>${S.mode === "db" ? "Conectada" : "Sin conexión"}</span></div>
     <dl class="kv"><dt>Cuenta</dt><dd>${esc(em || "—")}</dd><dt>Eventos</dt><dd>${S.events.length}</dd><dt>Correos</dt><dd>${S.emails.length}</dd><dt>Llamadas</dt><dd>${S.calls.length}</dd><dt>Por subir</dt><dd>${Object.keys(queue).length}</dd>
       <dt>Ajustes en la nube</dt><dd>${S.prefsNube === false ? "falta ejecutar supabase/02_cronova.sql" : S.prefsNube ? "sincronizados" : "—"}</dd></dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn sm" id="pSync">${ico("recargar")}Sincronizar ahora</button><button class="btn sm" id="pExport">${ico("descarga")}Descargar respaldo</button><button class="btn sm danger" id="pOut">${ico("salir")}Cerrar sesión</button></div>
   </div>
-  <div class="card set-sec" id="s-correo"><div class="card-h"><h2>Correo</h2></div>
-    <div class="set-row"><div class="l"><b>Bandeja</b><span>Por ahora pegas los correos en Correo y la IA encuentra fechas y compromisos.</span></div><div class="r"><a class="btn sm" href="#correo">${ico("correo")}Abrir correo</a></div></div>
-    <div class="set-row"><div class="l"><b>Conectar Gmail</b><span>Próximo paso: leer tu bandeja sola y enviarte el resumen cada mañana.</span></div><div class="r"><span class="chip" style="--c:var(--dim)"><i></i>Próximamente</span></div></div>
+  <div class="card set-sec" id="s-correo"><div class="card-h"><div class="sec-t">Correo</div></div>
+    <div class="set-row"><div class="l"><b>Bandeja</b><span>Pegas los correos en Correo y la IA encuentra fechas y compromisos.</span></div><div class="r"><a class="btn sm" href="#correo">${ico("correo")}Abrir correo</a></div></div>
+    <div class="set-row"><div class="l"><b>Conectar Gmail</b><span>Próximo paso: leer tu bandeja sola y mandarte el resumen cada mañana.</span></div><div class="r"><span class="badge"><i></i>Próximamente</span></div></div>
     <div class="set-row"><div class="l"><b>Hora del resumen de la mañana</b></div><div class="r"><input class="in" type="time" id="pBrief" value="${esc(PREFS.horaResumen)}" style="width:140px"></div></div>
   </div>
-  <div class="card set-sec" id="s-ia"><div class="card-h"><h2>Inteligencia artificial</h2><span class="chip" id="aiChip" style="--c:var(--dim)"><i></i>Sin probar</span></div>
+  <div class="card set-sec" id="s-ia"><div class="card-h"><div class="sec-t">Inteligencia artificial</div><span class="badge" id="aiChip"><i></i>Sin probar</span></div>
     <div class="set-row"><div class="l"><b>Estado de la IA</b><span>Usa la función orbita-ia de tu Supabase con tu clave de Anthropic.</span></div><div class="r"><button class="btn sm" id="pAiTest">${ico("ia")}Probar conexión</button></div></div>
     <p class="note" style="margin:8px 0 0">Para activarla: crea una clave en console.anthropic.com, guárdala en Supabase (Edge Functions → Secrets) como ANTHROPIC_API_KEY y despliega la función orbita-ia. Los pasos están en el LEEME del repositorio.</p>
   </div>
-  <div class="card set-sec" id="s-sistema"><div class="card-h"><h2>Sistema</h2></div>
-    <dl class="kv"><dt>Versión</dt><dd>CRONOVA 2.0</dd><dt>Hoy</dt><dd>${esc(fmtDayY(NOW()))}</dd><dt>Agenda permitida</dt><dd>${esc(TODAY())} → ${esc(MAXDATE())}</dd><dt>Municipios</dt><dd>${MUN.length.toLocaleString("es-CO")} (DANE)</dd></dl>
+  <div class="card set-sec" id="s-sistema"><div class="card-h"><div class="sec-t">Sistema</div></div>
+    <dl class="kv"><dt>Versión</dt><dd>CRONOVA 2.1</dd><dt>Hoy</dt><dd>${esc(cap1(fmtDayY(NOW())))}</dd><dt>Agenda permitida</dt><dd>${esc(TODAY())} → ${esc(MAXDATE())}</dd><dt>Lugares</dt><dd>${MUN.length.toLocaleString("es-CO")} municipios (DANE) + ${lug.length} guardados</dd></dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn sm" id="pReload">${ico("recargar")}Recargar la app</button><button class="btn sm ghost" id="pRoutes">${ico("ruta")}Borrar rutas guardadas</button></div>
   </div>`;
   const nameIn = $("#pName"); let nt = 0;
   nameIn.addEventListener("input", () => { clearTimeout(nt); nt = setTimeout(() => { const v = nameIn.value.trim(); if (v) savePrefs({ nombre: v }, true); }, 350); });
   nameIn.addEventListener("change", () => { if (nameIn.value.trim()) toast("Listo, te llamaré " + nameIn.value.trim() + ".", "ok", "guardar"); });
   $("#pHome").onclick = openHomeSheet;
-  $$("#settings [data-tema]").forEach(b => b.onclick = () => { savePrefs({ tema: b.dataset.tema }); Sfx.play("toque"); });
+  makeCombo($("#pPlaceBox"), $("#pPlace"), p => { savePlace(p); renderSettings(); toast(p.n + " quedó en tus lugares.", "ok", "guardar"); });
+  $$("#settings [data-rmplace]").forEach(b => b.onclick = () => { const l = (PREFS.lugares || []).slice(); l.splice(+b.dataset.rmplace, 1); savePrefs({ lugares: l }); Sfx.play("borrar"); });
+  bindSwatches($("#settings"));
   $$("#settings [data-fuente]").forEach(b => b.onclick = () => { savePrefs({ fuente: b.dataset.fuente }); Sfx.play("toque"); });
   $$("#settings [data-texto]").forEach(b => b.onclick = () => { savePrefs({ texto: b.dataset.texto }); Sfx.play("toque"); });
   $$("#settings [data-anim]").forEach(b => b.onclick = () => { savePrefs({ anim: b.dataset.anim }); Sfx.play("toque"); });
   $("#pSnd").onchange = e => { savePrefs({ sonido: e.target.checked }, true); if (e.target.checked) Sfx.play("completar"); };
-  $("#pVol").oninput = e => { savePrefs({ volumen: +e.target.value }, true); };
+  $("#pVol").oninput = e => savePrefs({ volumen: +e.target.value }, true);
   $("#pVol").onchange = () => Sfx.play("toque");
-  $("#pTest").onclick = () => { ["guardar", "completar", "alerta"].forEach((s, i) => setTimeout(() => Sfx.play(s), i * 700)); };
+  $("#pTest").onclick = () => ["guardar", "completar", "alerta"].forEach((s, i) => setTimeout(() => Sfx.play(s), i * 700));
   $("#pA60").onchange = e => savePrefs({ aviso60: e.target.checked }, true);
   $("#pA15").onchange = e => savePrefs({ aviso15: e.target.checked }, true);
   $("#pSys").onchange = async e => {
@@ -1080,16 +1100,18 @@ function renderSettings() {
     savePrefs({ avisoSistema: e.target.checked }, true);
   };
   $("#pBrief").onchange = e => savePrefs({ horaResumen: e.target.value }, true);
-  $("#pSync").onclick = async () => { await flush(); if (session) { try { await loadAll(); saveLocal(); renderAll(); toast("Sincronizado.", "ok", "guardar"); } catch (e) { toast("No se pudo sincronizar.", "bad", "error"); } } };
+  $("#pSync").onclick = syncNow;
   $("#pExport").onclick = () => { const blob = new Blob([JSON.stringify({ exportado: new Date().toISOString(), eventos: S.events, correos: S.emails, llamadas: S.calls, ajustes: PREFS }, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "cronova-respaldo-" + TODAY() + ".json"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast("Respaldo descargado.", "ok", "guardar"); };
   $("#pOut").onclick = async () => { if (supa) await supa.auth.signOut(); };
-  $("#pAiTest").onclick = async () => { const chip = $("#aiChip"); chip.style.setProperty("--c", "var(--acc-2)"); chip.innerHTML = "<i></i>Probando…";
+  $("#pAiTest").onclick = async () => { const chip = $("#aiChip"); chip.style.setProperty("--c", "var(--acc)"); chip.innerHTML = "<i></i>Probando…";
     try { const t = await ask("Responde solo con la palabra: listo"); chip.style.setProperty("--c", "var(--ok)"); chip.innerHTML = "<i></i>Activa"; toast("La IA responde: " + t.slice(0, 40), "ok", "respuesta"); }
     catch (e) { chip.style.setProperty("--c", "var(--bad)"); chip.innerHTML = "<i></i>No activa"; toast(aiErr(e), "bad", "error"); } };
   $("#pReload").onclick = () => location.reload();
-  $("#pRoutes").onclick = () => { Object.keys(RCACHE).forEach(k => delete RCACHE[k]); lsSet("cronova.rutas", {}); monthKm = {}; toast("Rutas borradas. Se recalculan al abrir el mapa.", "ok", "borrar"); };
+  $("#pRoutes").onclick = () => { Object.keys(RCACHE).forEach(k => delete RCACHE[k]); lsSet("cronova.rutas", {}); monthKm = {}; toast("Rutas borradas. Se recalculan solas.", "ok", "borrar"); };
 }
+async function syncNow() { await flush(); if (session) { try { await loadAll(); saveLocal(); renderAll(); toast("Sincronizado.", "ok", "guardar"); } catch (e) { toast("No se pudo sincronizar.", "bad", "error"); } } else toast("Entra con tu cuenta para sincronizar.", "warn"); }
+$("#syncPill").addEventListener("click", syncNow);
 
 /* ───────────────────────── Recordatorios ───────────────────────── */
 const warned = new Set(lsGet("cronova.avisados", []));

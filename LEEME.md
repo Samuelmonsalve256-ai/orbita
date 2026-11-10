@@ -5,7 +5,7 @@ Tu centro de mando personal: agenda, alertas, resumen de la mañana, asistente c
 - **App:** `https://samuelmonsalve256-ai.github.io/orbita/`
 - **Datos:** el mismo proyecto de Supabase de MotoContable, en tablas propias (`orb_items`, `orb_historial`). No toca nada de MotoContable.
 - **Cuenta:** entras con el mismo correo y contraseña de MotoContable.
-- **Municipios:** los 1.122 municipios de Colombia del DANE (Marco Geoestadístico Nacional 2018).
+- **Lugares:** los 1.122 municipios de Colombia del DANE, más tus lugares guardados (Doradal viene incluido). Los pueblos, corregimientos y veredas que no estén se buscan en OpenStreetMap y quedan guardados.
 - **Rutas:** distancias y tiempos por carretera de OpenStreetMap (servicio OSRM). Cada tramo tiene un botón para abrirlo en Waze con el tráfico en vivo.
 
 ---
@@ -20,6 +20,7 @@ Tu centro de mando personal: agenda, alertas, resumen de la mañana, asistente c
 | `js/mapa.js` | Mapa 3D de Colombia |
 | `js/vendor/` | Librerías incluidas (three.js, supabase-js) para que funcione sin depender de otros servidores |
 | `data/colombia.json` | Departamentos y municipios con sus coordenadas |
+| `data/mundo.json` | El mundo en hexágonos para el globo (Natural Earth) |
 | `manifest.webmanifest`, `icono-*.png`, `img/` | Ícono y logo para instalarla en el iPhone y el Mac |
 | `sw.js` | Guarda la app para que abra rápido y sin internet (no guarda tus datos) |
 | `supabase/01_orbita.sql` | Crea las tablas, las reglas de seguridad y el historial |

@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="es" data-tema="nova" data-fuente="moderna">
+<html lang="es" data-fuente="jakarta">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>CRONOVA</title>
 <meta name="description" content="CRONOVA · Agenda inteligente: citas, rutas por Colombia y asistente con IA.">
-<meta name="theme-color" content="#06071A">
+<meta name="theme-color" content="#f3f5fb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CRONOVA">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icono-180.png">
@@ -16,24 +16,22 @@
 <link rel="icon" type="image/svg+xml" href="img/cronova-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="css/cronova.css">
 <script>
   // Aplica tema, tipografía y tamaño antes de pintar (sin parpadeo).
   try{ var p = JSON.parse(localStorage.getItem("cronova.prefs")||"{}"); var h=document.documentElement;
-    if(p.tema) h.dataset.tema=p.tema; if(p.fuente) h.dataset.fuente=p.fuente; if(p.texto) h.dataset.texto=p.texto; if(p.anim) h.dataset.anim=p.anim; }catch(e){}
+    var C={indigo:["#4f46e5","#7c3aed"],azul:["#2563eb","#0ea5e9"],esmeralda:["#059669","#10b981"],turquesa:["#0d9488","#06b6d4"],naranja:["#ea580c","#f59e0b"],rosa:["#db2777","#f43f5e"],violeta:["#7c3aed","#c026d3"],grafito:["#334155","#64748b"]}[p.color||"indigo"];
+    if(C){ h.style.setProperty("--acc",C[0]); h.style.setProperty("--acc-2",C[1]); }
+    if(p.fuente) h.dataset.fuente=p.fuente; if(p.texto) h.dataset.texto=p.texto; if(p.anim) h.dataset.anim=p.anim; }catch(e){}
 </script>
 </head>
 <body>
 
 <!-- Iconos (se usan con <use href="#i-…">) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--acc)"/><stop offset="1" stop-color="var(--acc-2)"/></linearGradient>
-    <linearGradient id="logoGrad" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--acc)"/><stop offset="1" stop-color="var(--acc-2)"/></linearGradient>
-  </defs>
-  <symbol id="logo" viewBox="0 0 64 64"><path class="ring-path" pathLength="100" d="M51.3 37.2 A20 20 0 1 1 37.2 12.7" fill="none" stroke="url(#logoGrad)" stroke-width="6" stroke-linecap="round"/><path d="M32 32 L39.8 24.2" stroke="var(--fg)" stroke-width="3.2" stroke-linecap="round"/><circle cx="32" cy="32" r="3" fill="var(--fg)"/><path class="star" d="M46.1 9.4 Q46.1 17.9 54.6 17.9 Q46.1 17.9 46.1 26.4 Q46.1 17.9 37.6 17.9 Q46.1 17.9 46.1 9.4 Z" fill="var(--hot)"/></symbol>
-  <symbol id="i-inicio" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="9" rx="2.2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2.2"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="2.2"/><rect x="3" y="15" width="7.5" height="6" rx="2.2"/></symbol>
+  <symbol id="logo-w" viewBox="0 0 64 64"><path d="M51.3 37.2 A20 20 0 1 1 37.2 12.7" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M32 32 L39.8 24.2" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><circle cx="32" cy="32" r="3.4" fill="#fff"/><path d="M46.1 9.4 Q46.1 17.9 54.6 17.9 Q46.1 17.9 46.1 26.4 Q46.1 17.9 37.6 17.9 Q46.1 17.9 46.1 9.4 Z" fill="#FFD27A"/></symbol>
+<symbol id="i-inicio" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="9" rx="2.2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2.2"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="2.2"/><rect x="3" y="15" width="7.5" height="6" rx="2.2"/></symbol>
   <symbol id="i-agenda" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="3.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="8" cy="14" r=".6"/><circle cx="12" cy="14" r=".6"/><circle cx="16" cy="14" r=".6"/></symbol>
   <symbol id="i-mapa" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></symbol>
   <symbol id="i-ia" viewBox="0 0 24 24"><path d="M12 3l1.9 4.9L18.8 9.8l-4.9 1.9L12 16.6l-1.9-4.9L5.2 9.8l4.9-1.9z"/><path d="M18.5 15l.8 2.1 2.2.9-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.9z"/></symbol>
@@ -82,250 +80,200 @@
 <!-- ===================== INGRESO ===================== -->
 <div class="login" id="login" hidden>
   <form class="login-card" id="loginForm" autocomplete="on">
-    <svg class="login-logo" viewBox="0 0 64 64" aria-hidden="true"><path class="ring-path" pathLength="100" d="M51.3 37.2 A20 20 0 1 1 37.2 12.7" fill="none" stroke="url(#logoGrad)" stroke-width="6" stroke-linecap="round"/><path d="M32 32 L39.8 24.2" stroke="var(--fg)" stroke-width="3.2" stroke-linecap="round"/><circle cx="32" cy="32" r="3" fill="var(--fg)"/><path class="star" d="M46.1 9.4 Q46.1 17.9 54.6 17.9 Q46.1 17.9 46.1 26.4 Q46.1 17.9 37.6 17.9 Q46.1 17.9 46.1 9.4 Z" fill="var(--hot)"/></svg>
+    <div class="tile"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="ring-path" pathLength="100" d="M51.3 37.2 A20 20 0 1 1 37.2 12.7" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M32 32 L39.8 24.2" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><circle cx="32" cy="32" r="3.4" fill="#fff"/><path class="star" d="M46.1 9.4 Q46.1 17.9 54.6 17.9 Q46.1 17.9 46.1 26.4 Q46.1 17.9 37.6 17.9 Q46.1 17.9 46.1 9.4 Z" fill="#FFD27A"/></svg></div>
     <h1>CRONOVA</h1>
     <p class="tagline">Tu tiempo, bajo control.</p>
     <label class="field"><span>Correo</span><input class="in" id="lEmail" type="email" autocomplete="username" required></label>
     <label class="field"><span>Contraseña</span><input class="in" id="lPass" type="password" autocomplete="current-password" required></label>
     <button class="btn primary block" type="submit" id="lBtn">Entrar</button>
-    <div id="lErr" role="alert" style="color:var(--bad);font-size:.85rem;min-height:18px;text-align:center"></div>
-    <p class="dim" style="margin:0;font-size:.78rem;text-align:center">Usa la misma cuenta de MotoContable.</p>
+    <div id="lErr" role="alert" style="color:var(--bad);font-size:.88rem;min-height:18px;text-align:center"></div>
+    <p class="dim" style="margin:0;font-size:.82rem;text-align:center">Usa la misma cuenta de MotoContable.</p>
   </form>
 </div>
 
-<div class="app" id="app">
-  <!-- ===================== MENÚ LATERAL ===================== -->
+<!-- ===================== CABECERA ===================== -->
+<header class="hdr">
+  <a class="brand" href="#inicio" aria-label="CRONOVA, ir a inicio"><span class="tile"><svg viewBox="0 0 64 64"><use href="#logo-w"/></svg></span><b>CRONOVA</b></a>
+  <div class="greet">
+    <div class="hi"><span id="greetWord">Hola</span>, <b id="greetName">Samuel Rich</b></div>
+    <div class="date" id="todayLine"></div>
+  </div>
+  <div class="hdr-r">
+    <span class="pill clock-pill"><span class="clock" id="clock">--:--</span></span>
+    <button type="button" class="pill" id="syncPill" data-estado="off" title="Toca para sincronizar"><span class="dot"></span><span id="syncTxt">Nube</span></button>
+    <button type="button" class="hdr-btn" id="colorBtn" aria-label="Cambiar el color" title="Cambiar el color"><span class="bolita"></span></button>
+    <button class="btn primary" id="newBtnTop" type="button"><svg class="ico"><use href="#i-plus"/></svg>Nueva cita</button>
+  </div>
+</header>
+<div class="pop" id="colorPop" role="dialog" aria-label="Color" hidden><div class="pop-t">Color de CRONOVA</div><div class="swatches" id="swatchesPop"></div></div>
+
+<div class="layout">
+  <!-- ===================== MENÚ ===================== -->
   <aside class="side">
-    <a class="brand" href="#inicio" aria-label="CRONOVA, ir a inicio">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo"/></svg>
-      <div><div class="wordmark">CRONOVA</div><div class="wordmark-sub">Agenda inteligente</div></div>
-    </a>
     <nav class="nav" aria-label="Secciones">
-      <a href="#inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg>Inicio</a>
-      <a href="#agenda" data-v="agenda"><svg><use href="#i-agenda"/></svg>Agenda</a>
-      <a href="#mapa" data-v="mapa"><svg><use href="#i-mapa"/></svg>Mapa y rutas</a>
-      <a href="#asistente" data-v="asistente"><svg><use href="#i-ia"/></svg>Asistente IA</a>
-      <div class="sep"></div>
-      <a href="#llamadas" data-v="llamadas"><svg><use href="#i-llamada"/></svg>Llamadas</a>
-      <a href="#correo" data-v="correo"><svg><use href="#i-correo"/></svg>Correo</a>
-      <a href="#ajustes" data-v="ajustes"><svg><use href="#i-ajustes"/></svg>Ajustes</a>
+      <div class="nav-label">Día a día</div>
+      <a href="#inicio" data-v="inicio"><svg class="ico"><use href="#i-inicio"/></svg>Inicio</a>
+      <a href="#agenda" data-v="agenda"><svg class="ico"><use href="#i-agenda"/></svg>Agenda</a>
+      <a href="#asistente" data-v="asistente"><svg class="ico"><use href="#i-ia"/></svg>Asistente IA</a>
+      <div class="nav-label">Herramientas</div>
+      <a href="#llamadas" data-v="llamadas"><svg class="ico"><use href="#i-llamada"/></svg>Llamadas<span class="badge" id="badgeCalls" style="--c:var(--t-llamada)" hidden></span></a>
+      <a href="#correo" data-v="correo"><svg class="ico"><use href="#i-correo"/></svg>Correo<span class="badge" id="badgeMail" hidden></span></a>
+      <a href="#mapa" data-v="mapa"><svg class="ico"><use href="#i-mapa"/></svg>Mapa y rutas</a>
+      <div class="nav-label">Sistema</div>
+      <a href="#ajustes" data-v="ajustes"><svg class="ico"><use href="#i-ajustes"/></svg>Ajustes</a>
     </nav>
     <div class="side-foot">
-      <div class="sync-card" id="syncCard"><span class="led off"></span><div>Conectando…</div></div>
-      <a class="user-chip" href="#ajustes" id="userChip"><span class="avatar" id="avatar">SR</span><div style="min-width:0"><div class="n" id="userName">Samuel Rich</div><div class="e" id="userEmail"></div></div></a>
+      <a class="user" href="#ajustes"><span class="avatar" id="avatar">SR</span><div style="min-width:0"><div class="n" id="userName">Samuel Rich</div><div class="e" id="userEmail"></div></div></a>
     </div>
   </aside>
 
-  <div class="col">
-    <!-- ===================== BARRA SUPERIOR ===================== -->
-    <header class="top">
-      <div class="greet">
-        <div class="hi"><span id="greetWord">Hola</span>, <b id="greetName">Samuel Rich</b></div>
-        <div class="date" id="todayLine"></div>
+  <main class="views" id="views">
+    <!-- INICIO -->
+    <section class="view" id="v-inicio">
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-inicio"/></svg></span><div><h1 id="homeTitle">Hoy</h1><div class="sub" id="homeSub"></div></div></div>
+      <div class="banners" id="banners"></div>
+      <div class="grid g4" id="kpis"></div>
+      <div class="grid g2">
+        <div class="card next" id="nextCard"></div>
+        <div class="card"><div class="card-h"><div class="sec-t">Agenda de hoy</div><span class="meta" id="todayCount"></span></div><div class="tl" id="todayTl"></div></div>
       </div>
-      <div class="top-r">
-        <div class="clock" id="clock" aria-label="Hora actual">--:--</div>
-        <button class="btn primary" id="newBtnTop" type="button"><svg><use href="#i-plus"/></svg><span>Nueva cita</span></button>
+      <div class="grid g2">
+        <div class="card"><div class="card-h"><div class="sec-t">Próximos 7 días</div><a class="btn sm ghost" href="#agenda">Ver agenda</a></div><div class="tl" id="weekTl"></div></div>
+        <div class="card">
+          <div class="card-h"><div class="sec-t">Resumen de la mañana</div>
+            <div style="display:flex;gap:6px"><button class="btn sm ghost" id="speakBrief" hidden><svg class="ico"><use href="#i-sonido"/></svg>Escuchar</button><button class="btn sm primary" id="genBrief"><svg class="ico"><use href="#i-ia"/></svg>Generar</button></div>
+          </div>
+          <div class="brief" id="brief"></div>
+        </div>
       </div>
-    </header>
+    </section>
 
-    <main class="views" id="views">
-      <!-- INICIO -->
-      <section class="view" id="v-inicio">
-        <div class="grid g12">
-          <div class="card raised next s7" id="nextCard"></div>
-          <div class="card s5" id="yearCard"></div>
+    <!-- AGENDA -->
+    <section class="view" id="v-agenda" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-agenda"/></svg></span><div><h1>Agenda</h1><div class="sub" id="agSub"></div></div>
+        <div class="r"><div class="seg" role="group" aria-label="Vista"><button type="button" id="vwMes" aria-pressed="true">Mes</button><button type="button" id="vwLista" aria-pressed="false">Lista</button></div></div></div>
+      <div class="cal-wrap" id="calWrap">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:12px">
+          <div class="cal-bar"><button class="icon-btn" id="calPrev" aria-label="Mes anterior"><svg class="ico"><use href="#i-izq"/></svg></button><div class="cal-month" id="calMonth"></div><button class="icon-btn" id="calNext" aria-label="Mes siguiente"><svg class="ico"><use href="#i-der"/></svg></button><button class="btn sm" id="calToday">Hoy</button><span style="flex:1"></span><div class="legend" id="legend"></div></div>
+          <div class="cal" id="cal"></div>
         </div>
-        <div class="grid g12" id="stats"></div>
-        <div class="grid g12">
-          <div class="card s7">
-            <div class="card-h"><h2>Hoy</h2><span class="meta" id="todayCount"></span></div>
-            <div class="tl" id="todayTl"></div>
-          </div>
-          <div class="card s5">
-            <div class="card-h"><h2>Alertas</h2><span class="meta">próximas 48 h</span></div>
-            <div class="alerts" id="alerts"></div>
-          </div>
-        </div>
-        <div class="grid g12">
-          <div class="card s7">
-            <div class="card-h"><h2>Resumen de la mañana</h2>
-              <div style="display:flex;gap:6px"><button class="btn sm ghost" id="speakBrief" hidden><svg><use href="#i-sonido"/></svg>Escuchar</button><button class="btn sm primary" id="genBrief"><svg><use href="#i-ia"/></svg>Generar</button></div>
-            </div>
-            <div class="brief" id="brief"></div>
-          </div>
-          <div class="card s5">
-            <div class="card-h"><h2>Accesos rápidos</h2></div>
-            <div class="quick">
-              <a href="#llamadas"><svg><use href="#i-llamada"/></svg><div><b>Preparar llamada</b><br><span>La IA te arma el guion</span></div></a>
-              <a href="#asistente"><svg><use href="#i-ia"/></svg><div><b>Pedirle a la IA</b><br><span>Agenda hablando</span></div></a>
-              <a href="#mapa"><svg><use href="#i-ruta"/></svg><div><b>Ver mi ruta</b><br><span>Km y tiempos del mes</span></div></a>
-              <a href="#correo"><svg><use href="#i-correo"/></svg><div><b>Revisar correo</b><br><span>Encuentra compromisos</span></div></a>
-            </div>
-          </div>
-        </div>
-      </section>
+        <div class="side-panel"><div class="card">
+          <div class="day-big" id="dayBig"></div><div style="height:14px"></div>
+          <div class="ev-list" id="dayList"></div><div style="height:14px"></div>
+          <button class="btn primary block" id="dayAdd"><svg class="ico"><use href="#i-plus"/></svg>Agregar en este día</button>
+        </div></div>
+      </div>
+      <div id="listWrap" hidden><div id="upList" style="display:flex;flex-direction:column;gap:12px"></div></div>
+    </section>
 
-      <!-- AGENDA -->
-      <section class="view" id="v-agenda" hidden>
-        <div class="view-head">
-          <div><div class="eyebrow">Agenda</div><h1>Tus compromisos</h1></div>
-          <div class="cal-bar">
-            <div class="seg solid" role="group" aria-label="Vista">
-              <button type="button" id="vwMes" aria-pressed="true">Mes</button><button type="button" id="vwLista" aria-pressed="false">Lista</button>
-            </div>
-            <button class="icon-btn" id="calPrev" aria-label="Mes anterior"><svg><use href="#i-izq"/></svg></button>
-            <div class="cal-month" id="calMonth"></div>
-            <button class="icon-btn" id="calNext" aria-label="Mes siguiente"><svg><use href="#i-der"/></svg></button>
-            <button class="btn sm" id="calToday">Hoy</button>
+    <!-- MAPA -->
+    <section class="view" id="v-mapa" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-mapa"/></svg></span><div><h1>Mapa y rutas</h1><div class="sub">Tus salidas del mes, con kilómetros y tiempo.</div></div></div>
+      <div class="map-wrap">
+        <div class="map-box" id="mapBox">
+          <canvas id="mapCanvas" aria-label="Globo con tu recorrido por Colombia"></canvas>
+          <div class="map-over" id="mapOver"></div>
+          <div class="map-top"><div class="combo map-search" id="mapSearchBox"><svg class="ico"><use href="#i-buscar"/></svg><input class="in" id="mapSearch" placeholder="Buscar municipio, pueblo o vereda…" autocomplete="off" aria-label="Buscar lugar"></div></div>
+          <div class="map-ctrl">
+            <div class="grp"><button type="button" id="mzOut" aria-label="Alejar"><svg class="ico"><use href="#i-menos"/></svg></button><button type="button" id="mzIn" aria-label="Acercar"><svg class="ico"><use href="#i-plus"/></svg></button></div>
+            <div class="grp"><button type="button" id="mvCol" aria-pressed="true">Colombia</button><button type="button" id="mvMundo" aria-pressed="false">Mundo</button></div>
+            <div class="grp"><button type="button" id="mHome" aria-label="Ir a mi casa" title="Mi casa"><svg class="ico"><use href="#i-casa"/></svg></button><button type="button" id="mFit" aria-label="Ver mi recorrido" title="Mi recorrido"><svg class="ico"><use href="#i-ruta"/></svg></button></div>
           </div>
         </div>
-        <div class="cal-wrap" id="calWrap">
-          <div style="min-width:0;display:flex;flex-direction:column;gap:12px">
-            <div class="cal" id="cal"></div>
-            <div class="legend" id="legend"></div>
-          </div>
-          <div class="side-panel">
-            <div class="card raised">
-              <div class="day-big" id="dayBig"></div>
-              <div style="height:14px"></div>
-              <div class="ev-list" id="dayList"></div>
-              <div style="height:14px"></div>
-              <button class="btn primary block" id="dayAdd"><svg><use href="#i-plus"/></svg>Agregar en este día</button>
-            </div>
-          </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:14px">
+          <div class="card-h" style="margin:0"><div class="sec-t" id="mapMonth" style="text-transform:capitalize"></div>
+            <div style="display:flex;gap:6px"><button class="icon-btn" id="mapPrev" aria-label="Mes anterior"><svg class="ico"><use href="#i-izq"/></svg></button><button class="icon-btn" id="mapNext" aria-label="Mes siguiente"><svg class="ico"><use href="#i-der"/></svg></button></div></div>
+          <div class="route-total" id="routeTotal"></div>
+          <div class="legs" id="legs"></div>
+          <div class="home-row" id="homeRow"></div>
+          <p class="dim" style="font-size:.78rem;margin:0">Kilómetros y tiempos por carretera de OpenStreetMap. Para el tráfico en vivo abre cada tramo en Waze.</p>
         </div>
-        <div class="card" id="listWrap" hidden><div id="upList" style="display:flex;flex-direction:column;gap:14px"></div></div>
-      </section>
+      </div>
+    </section>
 
-      <!-- MAPA -->
-      <section class="view" id="v-mapa" hidden>
-        <div class="map-wrap">
-          <div class="map-box" id="mapBox">
-            <canvas id="mapCanvas" aria-label="Mapa 3D de Colombia con tu recorrido"></canvas>
-            <div class="map-labels" id="mapLabels"></div>
-            <div class="map-top">
-              <div class="combo map-search" id="mapSearchBox">
-                <svg class="ico"><use href="#i-buscar"/></svg>
-                <input class="in" id="mapSearch" placeholder="Buscar municipio o pueblo…" autocomplete="off" aria-label="Buscar municipio">
-              </div>
-            </div>
-            <div class="map-ctrl">
-              <button class="icon-btn" id="mzIn" aria-label="Acercar"><svg><use href="#i-plus"/></svg></button>
-              <button class="icon-btn" id="mzOut" aria-label="Alejar"><svg><use href="#i-menos"/></svg></button>
-              <button class="icon-btn" id="mTilt" aria-label="Cambiar entre vista 3D y vista desde arriba"><svg><use href="#i-3d"/></svg></button>
-              <button class="icon-btn" id="mHome" aria-label="Ir a mi casa"><svg><use href="#i-casa"/></svg></button>
-              <button class="icon-btn" id="mFit" aria-label="Ver todo el recorrido"><svg><use href="#i-centro"/></svg></button>
-            </div>
-            <div class="map-hint" id="mapHint">Arrastra para moverte · pellizca o usa la rueda para acercar · dos dedos o clic derecho para girar</div>
-          </div>
-          <div class="card raised" style="display:flex;flex-direction:column;gap:14px;min-width:0">
-            <div class="card-h" style="margin:0">
-              <div><div class="eyebrow">Recorrido</div><h2 id="mapMonth" style="text-transform:capitalize"></h2></div>
-              <div style="display:flex;gap:6px"><button class="icon-btn" id="mapPrev" aria-label="Mes anterior"><svg><use href="#i-izq"/></svg></button><button class="icon-btn" id="mapNext" aria-label="Mes siguiente"><svg><use href="#i-der"/></svg></button></div>
-            </div>
-            <div class="home-row" id="homeRow"></div>
-            <div class="route-sum" id="routeSum"></div>
-            <div class="legs" id="legs"></div>
-            <p class="dim" style="font-size:.74rem;margin:0">Distancias y tiempos por carretera según OpenStreetMap. Para ver el tráfico en vivo, abre cada tramo en Waze.</p>
-          </div>
+    <!-- ASISTENTE -->
+    <section class="view" id="v-asistente" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-ia"/></svg></span><div><h1>Asistente IA</h1><div class="sub">Agenda, mueve y consulta hablando normal.</div></div>
+        <div class="r"><button class="btn sm" id="chatClear"><svg class="ico"><use href="#i-recargar"/></svg>Nueva conversación</button></div></div>
+      <div class="card chat">
+        <div class="msgs" id="msgs" aria-live="polite"></div>
+        <div class="composer">
+          <button class="icon-btn mic" id="mic" aria-label="Dictar por voz" hidden style="width:44px;height:44px"><svg class="ico"><use href="#i-mic"/></svg></button>
+          <textarea class="in" id="chatIn" rows="1" placeholder="Ej: agéndame el dentista el jueves a las 3 pm en Doradal"></textarea>
+          <button class="btn primary" id="chatSend" aria-label="Enviar" style="height:44px"><svg class="ico"><use href="#i-enviar"/></svg></button>
+          <button class="btn" id="chatStop" hidden style="height:44px"><svg class="ico"><use href="#i-stop"/></svg>Detener</button>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- ASISTENTE -->
-      <section class="view" id="v-asistente" hidden>
-        <div class="view-head">
-          <div><div class="eyebrow">Inteligencia artificial</div><h1>Asistente CRONOVA</h1></div>
-          <button class="btn sm ghost" id="chatClear"><svg><use href="#i-recargar"/></svg>Nueva conversación</button>
+    <!-- LLAMADAS -->
+    <section class="view" id="v-llamadas" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-llamada"/></svg></span><div><h1>Llamadas</h1><div class="sub">La IA te prepara el guion para pedir citas.</div></div></div>
+      <div class="grid g-side">
+        <div class="card">
+          <div class="card-h"><div class="sec-t">Nueva llamada</div></div>
+          <form id="callForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
+            <label class="field"><span>A quién llamar</span><input class="in" id="cName" required placeholder="Consultorio Dra. Pérez"></label>
+            <label class="field"><span>Teléfono</span><input class="in" id="cPhone" required placeholder="+57 300 000 0000" inputmode="tel"></label>
+            <label class="field"><span>Para qué</span><input class="in" id="cGoal" required placeholder="Agendar control de ortodoncia"></label>
+            <label class="field"><span>Cuándo te sirve</span><input class="in" id="cWindow" placeholder="Martes o jueves en la tarde"></label>
+            <div class="field"><span>Lugar de la cita</span><div class="combo" id="cMuniBox"><input class="in" id="cMuni" placeholder="Municipio, pueblo o vereda" autocomplete="off"></div></div>
+            <button class="btn primary" type="submit"><svg class="ico"><use href="#i-ia"/></svg>Preparar llamada</button>
+          </form>
+          <p class="note" style="margin:14px 0 0">La IA revisa tus espacios libres y escribe el guion. Tú llamas, registras el resultado y la cita entra sola a la agenda.</p>
         </div>
-        <div class="card chat">
-          <div class="msgs" id="msgs" aria-live="polite"></div>
-          <div class="composer">
-            <button class="icon-btn mic" id="mic" aria-label="Dictar por voz" hidden style="width:46px;height:46px"><svg><use href="#i-mic"/></svg></button>
-            <textarea class="in" id="chatIn" rows="1" placeholder="Ej: agéndame el dentista el jueves a las 3 pm en Rionegro"></textarea>
-            <button class="btn primary" id="chatSend" aria-label="Enviar" style="height:46px"><svg><use href="#i-enviar"/></svg></button>
-            <button class="btn" id="chatStop" hidden style="height:46px"><svg><use href="#i-stop"/></svg>Detener</button>
-          </div>
-        </div>
-      </section>
+        <div class="card"><div class="card-h"><div class="sec-t">Cola de llamadas</div><span class="meta" id="callCount"></span></div><div class="ev-list" id="calls"></div></div>
+      </div>
+    </section>
 
-      <!-- LLAMADAS -->
-      <section class="view" id="v-llamadas" hidden>
-        <div class="view-head"><div><div class="eyebrow">Agente de llamadas</div><h1>Llamadas para agendar</h1></div></div>
-        <div class="grid g-side">
-          <div class="card raised">
-            <div class="card-h"><h2>Nueva llamada</h2></div>
-            <form id="callForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
-              <label class="field"><span>A quién llamar</span><input class="in" id="cName" required placeholder="Consultorio Dra. Pérez"></label>
-              <label class="field"><span>Teléfono</span><input class="in" id="cPhone" required placeholder="+57 300 000 0000" inputmode="tel"></label>
-              <label class="field"><span>Para qué</span><input class="in" id="cGoal" required placeholder="Agendar control de ortodoncia"></label>
-              <label class="field"><span>Cuándo te sirve</span><input class="in" id="cWindow" placeholder="Martes o jueves en la tarde"></label>
-              <div class="field"><span>Municipio de la cita</span><div class="combo" id="cMuniBox"><input class="in" id="cMuni" placeholder="Buscar municipio…" autocomplete="off"></div></div>
-              <button class="btn primary" type="submit"><svg><use href="#i-ia"/></svg>Preparar llamada con IA</button>
-            </form>
-            <p class="note" style="margin:14px 0 0">La IA revisa tus espacios libres y escribe el guion con horarios que sí te sirven. Tú haces la llamada, registras el resultado y la cita entra sola al calendario.</p>
-          </div>
-          <div class="card">
-            <div class="card-h"><h2>Cola de llamadas</h2><span class="meta" id="callCount"></span></div>
-            <div class="ev-list" id="calls"></div>
-          </div>
+    <!-- CORREO -->
+    <section class="view" id="v-correo" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-correo"/></svg></span><div><h1>Correo</h1><div class="sub">Pega un correo y la IA encuentra fechas y compromisos.</div></div>
+        <div class="r"><button class="btn primary" id="mailScan"><svg class="ico"><use href="#i-ia"/></svg>Buscar compromisos</button></div></div>
+      <div class="grid g-side">
+        <div class="card">
+          <div class="card-h"><div class="sec-t">Agregar un correo</div></div>
+          <form id="mailForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
+            <label class="field"><span>De</span><input class="in" id="mFrom" required placeholder="banco@…, jefe@…"></label>
+            <label class="field"><span>Asunto</span><input class="in" id="mSubj" required></label>
+            <label class="field"><span>Contenido</span><textarea class="in" id="mBody" rows="5" placeholder="Pega aquí el texto del correo"></textarea></label>
+            <button class="btn" type="submit"><svg class="ico"><use href="#i-plus"/></svg>Guardar en la bandeja</button>
+          </form>
+          <div id="found" class="ev-list" style="margin-top:16px"></div>
         </div>
-      </section>
+        <div class="card"><div class="card-h"><div class="sec-t">Bandeja</div><span class="meta" id="mailCount"></span></div><div id="mails"></div></div>
+      </div>
+    </section>
 
-      <!-- CORREO -->
-      <section class="view" id="v-correo" hidden>
-        <div class="view-head">
-          <div><div class="eyebrow">Bandeja</div><h1>Correo</h1></div>
-          <button class="btn primary" id="mailScan"><svg><use href="#i-ia"/></svg>Buscar compromisos con IA</button>
-        </div>
-        <div class="grid g-side">
-          <div class="card raised">
-            <div class="card-h"><h2>Agregar un correo</h2></div>
-            <form id="mailForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
-              <label class="field"><span>De</span><input class="in" id="mFrom" required placeholder="banco@…, jefe@…"></label>
-              <label class="field"><span>Asunto</span><input class="in" id="mSubj" required></label>
-              <label class="field"><span>Contenido</span><textarea class="in" id="mBody" rows="5" placeholder="Pega aquí el texto del correo"></textarea></label>
-              <button class="btn" type="submit"><svg><use href="#i-plus"/></svg>Guardar en la bandeja</button>
-            </form>
-            <div id="found" class="ev-list" style="margin-top:16px"></div>
-          </div>
-          <div class="card">
-            <div class="card-h"><h2>Bandeja</h2><span class="meta" id="mailCount"></span></div>
-            <div id="mails"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- AJUSTES -->
-      <section class="view" id="v-ajustes" hidden>
-        <div class="view-head"><div><div class="eyebrow">Configuración</div><h1>Ajustes</h1></div></div>
-        <div class="set-wrap">
-          <nav class="set-nav" aria-label="Secciones de ajustes">
-            <a href="#ajustes" data-sec="s-perfil"><svg><use href="#i-perfil"/></svg>Perfil y casa</a>
-            <a href="#ajustes" data-sec="s-apariencia"><svg><use href="#i-paleta"/></svg>Colores</a>
-            <a href="#ajustes" data-sec="s-tipo"><svg><use href="#i-texto"/></svg>Tipografía</a>
-            <a href="#ajustes" data-sec="s-sonido"><svg><use href="#i-sonido"/></svg>Sonidos y animación</a>
-            <a href="#ajustes" data-sec="s-avisos"><svg><use href="#i-campana"/></svg>Recordatorios</a>
-            <a href="#ajustes" data-sec="s-nube"><svg><use href="#i-nube"/></svg>Nube</a>
-            <a href="#ajustes" data-sec="s-correo"><svg><use href="#i-correo"/></svg>Correo</a>
-            <a href="#ajustes" data-sec="s-ia"><svg><use href="#i-chip"/></svg>Inteligencia artificial</a>
-            <a href="#ajustes" data-sec="s-sistema"><svg><use href="#i-info"/></svg>Sistema</a>
-          </nav>
-          <div style="display:flex;flex-direction:column;gap:16px;min-width:0" id="settings"></div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- ===================== BARRA INFERIOR (teléfono) ===================== -->
-  <nav class="tabs" aria-label="Secciones">
-    <a href="#inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg>Inicio</a>
-    <a href="#agenda" data-v="agenda"><svg><use href="#i-agenda"/></svg>Agenda</a>
-    <button type="button" class="fab" id="newBtnTab" aria-label="Nueva cita"><svg><use href="#i-plus"/></svg></button>
-    <a href="#mapa" data-v="mapa"><svg><use href="#i-mapa"/></svg>Mapa</a>
-    <button type="button" id="moreBtn" data-v="mas"><svg><use href="#i-mas"/></svg>Más</button>
-  </nav>
+    <!-- AJUSTES -->
+    <section class="view" id="v-ajustes" hidden>
+      <div class="page-title"><span class="tile"><svg class="ico"><use href="#i-ajustes"/></svg></span><div><h1>Ajustes</h1><div class="sub">Tu perfil, tu casa y cómo se ve CRONOVA.</div></div></div>
+      <div class="set-wrap">
+        <nav class="set-nav" aria-label="Secciones de ajustes">
+          <a href="#ajustes" data-sec="s-perfil"><svg class="ico"><use href="#i-perfil"/></svg>Perfil y lugares</a>
+          <a href="#ajustes" data-sec="s-apariencia"><svg class="ico"><use href="#i-paleta"/></svg>Color</a>
+          <a href="#ajustes" data-sec="s-tipo"><svg class="ico"><use href="#i-texto"/></svg>Tipografía</a>
+          <a href="#ajustes" data-sec="s-sonido"><svg class="ico"><use href="#i-sonido"/></svg>Sonidos y animación</a>
+          <a href="#ajustes" data-sec="s-avisos"><svg class="ico"><use href="#i-campana"/></svg>Recordatorios</a>
+          <a href="#ajustes" data-sec="s-nube"><svg class="ico"><use href="#i-nube"/></svg>Nube</a>
+          <a href="#ajustes" data-sec="s-correo"><svg class="ico"><use href="#i-correo"/></svg>Correo</a>
+          <a href="#ajustes" data-sec="s-ia"><svg class="ico"><use href="#i-chip"/></svg>Inteligencia artificial</a>
+          <a href="#ajustes" data-sec="s-sistema"><svg class="ico"><use href="#i-info"/></svg>Sistema</a>
+        </nav>
+        <div style="display:flex;flex-direction:column;gap:1rem;min-width:0" id="settings"></div>
+      </div>
+    </section>
+  </main>
 </div>
+
+<!-- ===================== BARRA INFERIOR (teléfono) ===================== -->
+<nav class="tabs" aria-label="Secciones">
+  <a href="#inicio" data-v="inicio"><svg class="ico"><use href="#i-inicio"/></svg>Inicio</a>
+  <a href="#agenda" data-v="agenda"><svg class="ico"><use href="#i-agenda"/></svg>Agenda</a>
+  <button type="button" class="fab" id="newBtnTab" aria-label="Nueva cita"><svg class="ico"><use href="#i-plus"/></svg></button>
+  <a href="#asistente" data-v="asistente"><svg class="ico"><use href="#i-ia"/></svg>Asistente</a>
+  <button type="button" id="moreBtn" data-v="mas"><svg class="ico"><use href="#i-mas"/></svg>Más</button>
+</nav>
 
 <div id="sheetRoot"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
