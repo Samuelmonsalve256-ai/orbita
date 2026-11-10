@@ -1,7 +1,7 @@
 // CRONOVA · service worker
 // Guarda la app (no tus datos) para que abra rápido y funcione sin internet.
 // Los datos viven en Supabase y en la copia local del navegador.
-const CACHE = "cronova-v4";
+const CACHE = "cronova-v5";
 const SHELL = ["./", "index.html", "css/cronova.css", "js/app.js", "js/mapa.js", "js/vendor/supabase.js", "js/vendor/three.min.js",
   "js/vendor/OrbitControls.js", "data/colombia.json", "data/colombia-hex.json", "manifest.webmanifest", "icono-180.png", "icono-512.png", "img/cronova-logo.svg", "img/favicon-32.png"];
 
