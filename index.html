@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Órbita Agenda</title>
+<meta name="description" content="Panel de vida: agenda, rutas por Colombia y asistente con IA.">
+<meta name="theme-color" content="#060A13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Órbita">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" type="image/png" href="icono-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: command-center shell — fixed rail on the left (bottom bar on phones), one working view at a time, cards only where they hold a distinct object. Deliberately dark-only. */
+:root{
+  color-scheme: dark;
+  --ink:#060A13;        /* page ground */
+  --deck:#0C1322;       /* panels */
+  --deck-2:#111B2F;     /* raised */
+  --line:#1C2942;
+  --line-2:#27375A;
+  --fg:#E7EDF8;
+  --muted:#8693B0;
+  --dim:#56627E;
+  --gold:#F4B740;       /* primary accent: Colombian gold */
+  --gold-soft:rgba(244,183,64,.14);
+  --ice:#6FD0FF;        /* secondary: route light */
+  --ice-soft:rgba(111,208,255,.12);
+  --ok:#43D6A0; --warn:#F59E5B; --bad:#FF6B7F;
+  --t-cita:#6FD0FF; --t-comp:#F4B740; --t-viaje:#B794FF; --t-llamada:#43D6A0; --t-personal:#FF8FB1;
+  --f-display:"Unbounded","Space Grotesk",system-ui,sans-serif;
+  --f-body:"Manrope","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:14px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+a.btn{text-decoration:none;color:var(--fg)}
+a.btn.primary{color:#1A1204}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(1200px 600px at 85% -10%,rgba(111,208,255,.07),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(244,183,64,.05),transparent 60%);background-attachment:fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100%}
+/* ---------- rail ---------- */
+.rail{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:6px;padding:22px 14px;padding-left:max(14px,env(safe-area-inset-left,0px));border-right:1px solid var(--line);background:rgba(8,13,24,.75);backdrop-filter:blur(12px)}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 22px}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand-name{font-family:var(--f-display);font-weight:700;letter-spacing:.14em;font-size:15px}
+.brand-sub{font-family:var(--f-mono);font-size:10px;color:var(--dim);letter-spacing:.12em}
+.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;transition:background .15s,color .15s}
+.nav a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.nav a:hover{background:var(--deck-2);color:var(--fg)}
+.nav a[aria-current="page"]{background:var(--gold-soft);color:var(--gold)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.rail-foot{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:12px;color:var(--muted)}
+.rail-foot b{color:var(--fg);font-family:var(--f-mono);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:6px;box-shadow:0 0 8px var(--ok)}
+.dot.off{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+/* ---------- main ---------- */
+main{min-width:0;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.view{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.view-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(24px,3.2vw,34px);line-height:1.15;margin:4px 0 0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;margin:0}
+h3{font-size:14px;margin:0;font-weight:700}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.panel{background:linear-gradient(180deg,var(--deck),rgba(12,19,34,.85));border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.grid{display:grid;gap:18px}
+.g-panel{grid-template-columns:1.35fr 1fr}
+.g-stats{grid-template-columns:repeat(4,1fr);gap:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line-2);background:var(--deck-2);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13.5px;cursor:pointer;transition:border-color .15s,background .15s,transform .1s;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--gold);color:#1A1204;border-color:var(--gold)}
+.btn.primary:hover{background:#FFC85A}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid currentColor;line-height:1.4;white-space:nowrap}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.t-cita{color:var(--t-cita)}.t-compromiso{color:var(--t-comp)}.t-viaje{color:var(--t-viaje)}.t-llamada{color:var(--t-llamada)}.t-personal{color:var(--t-personal)}
+.example-tag{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;color:var(--dim);border:1px dashed var(--line-2);border-radius:6px;padding:1px 6px}
+/* hero: next appointment */
+.next{position:relative;overflow:hidden;padding:24px;border-color:var(--line-2)}
+.next::after{content:"";position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:50%;border:1px solid rgba(244,183,64,.18);box-shadow:0 0 0 30px rgba(244,183,64,.04),0 0 0 70px rgba(244,183,64,.025);pointer-events:none}
+.count{display:flex;gap:18px;margin-top:18px;flex-wrap:wrap}
+.count div{display:flex;flex-direction:column}
+.count b{font-family:var(--f-display);font-size:clamp(28px,4vw,40px);font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.count span{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-top:6px}
+.next-title{font-size:20px;font-weight:700;margin-top:8px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:13.5px;margin-top:6px}
+.stat{padding:16px}
+.stat .lab{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stat .val{font-family:var(--f-display);font-size:26px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums}
+.stat .sub{font-size:12.5px;color:var(--dim)}
+/* timeline */
+.tl{display:flex;flex-direction:column}
+.tl-item{display:grid;grid-template-columns:62px 14px 1fr auto;gap:12px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.tl-item:first-child{border-top:0}
+.tl-time{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-top:1px}
+.tl-dot{width:10px;height:10px;border-radius:50%;margin-top:6px;background:currentColor;box-shadow:0 0 10px currentColor}
+.tl-body{min-width:0}
+.tl-body .t{font-weight:700}
+.tl-body .s{font-size:13px;color:var(--muted)}
+.tl-item.done .t{text-decoration:line-through;color:var(--dim)}
+.empty{padding:22px;border:1px dashed var(--line-2);border-radius:12px;color:var(--muted);text-align:center;font-size:14px}
+.brief{white-space:pre-wrap;font-size:14.5px;line-height:1.65;min-height:60px}
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--deck-2);border:1px solid var(--line);font-size:13.5px}
+.alert i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+/* ---------- calendar ---------- */
+.cal-wrap{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.cal-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cal-month{font-family:var(--f-display);font-size:18px;font-weight:600;min-width:190px;text-transform:capitalize}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--deck)}
+.cal .dow{padding:10px 8px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line);background:rgba(17,27,47,.6)}
+.day{min-height:104px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0;background:transparent;text-align:left;border-top:0;border-left:0;transition:background .12s}
+.day:nth-child(7n+7){border-right:0}
+.day:hover{background:rgba(111,208,255,.04)}
+.day.out{opacity:.35}
+.day .n{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between}
+.day.today .n b{background:var(--gold);color:#1A1204;border-radius:6px;padding:0 6px}
+.day.sel{background:var(--gold-soft);box-shadow:inset 0 0 0 1px var(--gold)}
+.day .ev{font-size:11.5px;font-weight:600;padding:2px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.04);border-left:2px solid currentColor}
+.day .more{font-size:11px;color:var(--dim)}
+.side{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+form.fx{display:flex;flex-direction:column;gap:10px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;min-width:0}
+input.i,select.i,textarea.i{background:var(--ink);border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:14px;width:100%;min-width:0}
+textarea.i{resize:vertical;min-height:70px}
+input.i:focus,select.i:focus,textarea.i:focus{border-color:var(--gold);outline:none}
+.ev-list{display:flex;flex-direction:column;gap:8px}
+.ev-card{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--deck-2);align-items:flex-start}
+.ev-card .bar{width:3px;align-self:stretch;border-radius:3px;background:currentColor;flex:none}
+.ev-card .body{flex:1;min-width:0}
+.ev-card .acts{display:flex;gap:4px}
+.icon-btn{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
+.icon-btn:hover{color:var(--fg);border-color:var(--line-2)}
+.icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8}
+/* ---------- map ---------- */
+.map-wrap{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:stretch}
+.globe-box{position:relative;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-height:560px;background:radial-gradient(circle at 50% 45%,#0B1630 0%,#060A13 70%)}
+#globe{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#globe:active{cursor:grabbing}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(10px,-50%);font-family:var(--f-mono);font-size:11px;white-space:nowrap;color:var(--fg);text-shadow:0 0 6px #000,0 0 2px #000;letter-spacing:.04em}
+.lbl small{color:var(--gold);margin-right:5px}
+.globe-hud{position:absolute;left:14px;top:14px;right:14px;display:flex;justify-content:space-between;gap:10px;pointer-events:none;flex-wrap:wrap}
+.hud-card{pointer-events:auto;background:rgba(6,10,19,.7);backdrop-filter:blur(8px);border:1px solid var(--line-2);border-radius:12px;padding:10px 14px}
+.hud-card .lab{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.hud-card .val{font-family:var(--f-display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.globe-ctrl{position:absolute;right:14px;bottom:14px;display:flex;gap:6px}
+.globe-fallback{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);padding:20px;text-align:center}
+.legs{display:flex;flex-direction:column}
+.leg{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.leg:first-child{border-top:0}
+.leg .num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:11.5px;border:1px solid var(--gold);color:var(--gold)}
+.leg .num.home{border-color:var(--ice);color:var(--ice)}
+.leg-move{font-family:var(--f-mono);font-size:12px;color:var(--ice);margin-top:4px}
+.leg-warn{font-size:12.5px;color:var(--warn);margin-top:4px}
+/* ---------- assistant ---------- */
+.chat{display:flex;flex-direction:column;height:calc(100vh - 210px);height:calc(100dvh - 210px);min-height:460px;padding:0;overflow:hidden}
+.msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:78%;padding:11px 14px;border-radius:14px;font-size:14.5px;white-space:pre-wrap;line-height:1.55;min-width:0;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--gold);color:#1A1204;border-bottom-right-radius:4px;font-weight:500}
+.msg.ai{align-self:flex-start;background:var(--deck-2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.tool{align-self:flex-start;font-family:var(--f-mono);font-size:11.5px;color:var(--ice);background:var(--ice-soft);border:1px solid rgba(111,208,255,.25);padding:6px 10px;border-radius:8px}
+.composer{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:rgba(6,10,19,.6)}
+.composer textarea{flex:1;resize:none;min-height:44px;max-height:140px}
+.sugs{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 12px}
+.sug{font-size:12.5px;border:1px solid var(--line-2);border-radius:999px;padding:6px 12px;background:transparent;cursor:pointer;color:var(--muted)}
+.sug:hover{color:var(--fg);border-color:var(--gold)}
+.mic.on{background:var(--bad);border-color:var(--bad);color:#fff}
+/* ---------- calls / mail ---------- */
+.g-two{grid-template-columns:380px 1fr;align-items:start}
+.note{font-size:13px;color:var(--muted);border-left:2px solid var(--ice);padding:8px 12px;background:var(--ice-soft);border-radius:0 8px 8px 0}
+.call{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--deck-2);display:flex;flex-direction:column;gap:10px}
+.call-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.script{white-space:pre-wrap;font-size:13.5px;background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:260px;overflow:auto}
+.st{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:6px}
+.st.prep{color:var(--ice);background:var(--ice-soft)}
+.st.ready{color:var(--gold);background:var(--gold-soft)}
+.st.ok{color:var(--ok);background:rgba(67,214,160,.12)}
+.st.fail{color:var(--bad);background:rgba(255,107,127,.12)}
+.mail{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line)}
+.mail:first-child{border-top:0}
+.mail .from{font-weight:700;font-size:14px}
+.mail .subj{font-size:13.5px}
+.mail .prev{grid-column:1/-1;font-size:13px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mail.unread .from::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-right:8px;vertical-align:middle}
+.found{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--deck-2);flex-wrap:wrap}
+/* ---------- toasts ---------- */
+.login{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px));background:radial-gradient(800px 500px at 50% 0%,rgba(111,208,255,.10),transparent 60%),var(--ink)}
+.login-card{width:min(400px,100%);display:flex;flex-direction:column;gap:14px;padding:28px;border:1px solid var(--line-2);border-radius:18px;background:var(--deck)}
+.rail-foot button{margin-top:8px}
+main{padding-top:calc(28px + env(safe-area-inset-top,0px))}
+.toasts{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--deck-2);border:1px solid var(--line-2);border-left:3px solid var(--gold);border-radius:10px;padding:12px 14px;font-size:13.5px;box-shadow:0 12px 30px rgba(0,0,0,.45);animation:tin .25s ease-out}
+.toast.urgent{border-left-color:var(--bad)}
+@keyframes tin{from{transform:translateY(8px);opacity:.3}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ---------- responsive ---------- */
+@media (max-width:1100px){.cal-wrap,.map-wrap{grid-template-columns:1fr}.side{position:static}.g-two{grid-template-columns:1fr}}
+@media (max-width:900px){.g-panel{grid-template-columns:1fr}.g-stats{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .rail{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;flex-direction:row;z-index:40;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));border-right:0;border-top:1px solid var(--line)}
+  .brand,.rail-foot{display:none}
+  .nav{flex-direction:row;justify-content:space-around;width:100%}
+  .nav a{flex-direction:column;gap:3px;font-size:10.5px;padding:6px 4px}
+  main{padding-bottom:96px}
+  .day{min-height:64px;padding:5px}
+  .day .ev{font-size:0;padding:0;height:5px;border-left:0;background:currentColor}
+  .globe-box{min-height:420px}
+  .msg{max-width:90%}
+  .chat{height:calc(100dvh - 250px)}
+  .toasts{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+}
+@media (max-width:420px){.row{grid-template-columns:1fr}.g-stats{gap:10px}.stat .val{font-size:22px}}
+</style>
+
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" style="width:46px;height:46px"><circle cx="16" cy="16" r="6" fill="#F4B740"/><ellipse cx="16" cy="16" rx="14" ry="6" fill="none" stroke="#6FD0FF" stroke-width="1.4" transform="rotate(-28 16 16)"/><circle cx="27.5" cy="10" r="2" fill="#6FD0FF"/></svg>
+    <div><div class="brand-name" style="font-size:20px">ÓRBITA</div><div class="brand-sub">PANEL DE VIDA</div></div>
+    <p class="muted" style="margin:0;font-size:13.5px">Entra con la misma cuenta que usas en MotoContable. Tus citas quedan guardadas en la nube y se ven igual en el iPhone y en el Mac.</p>
+    <label class="f">Correo<input class="i" id="lEmail" type="email" autocomplete="username" required></label>
+    <label class="f">Contraseña<input class="i" id="lPass" type="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit" id="lBtn">Entrar</button>
+    <div id="lErr" style="color:var(--bad);font-size:13px;min-height:18px"></div>
+  </form>
+</div>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6" fill="#F4B740"/><ellipse cx="16" cy="16" rx="14" ry="6" fill="none" stroke="#6FD0FF" stroke-width="1.4" transform="rotate(-28 16 16)"/><circle cx="27.5" cy="10" r="2" fill="#6FD0FF"/></svg>
+      <div><div class="brand-name">ÓRBITA</div><div class="brand-sub">PANEL DE VIDA</div></div>
+    </div>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#panel" data-v="panel"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>Panel</a>
+      <a href="#calendario" data-v="calendario"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendario</a>
+      <a href="#mapa" data-v="mapa"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>Mapa</a>
+      <a href="#asistente" data-v="asistente"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Asistente</a>
+      <a href="#llamadas" data-v="llamadas"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg>Llamadas</a>
+      <a href="#correo" data-v="correo"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 8l9 6 9-6"/></svg>Correo</a>
+    </nav>
+    <div class="rail-foot" id="syncState"><span class="dot off"></span>Conectando…</div>
+  </aside>
+
+  <main>
+    <!-- ================= PANEL ================= -->
+    <section class="view" id="v-panel">
+      <div class="view-head">
+        <div><div class="eyebrow" id="todayLabel">—</div><h1 id="greet">Buenos días</h1></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn" href="#calendario"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nueva cita</a>
+          <a class="btn primary" href="#asistente"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>Pedirle algo a la IA</a>
+        </div>
+      </div>
+
+      <div class="grid g-panel">
+        <div class="panel next" id="nextCard"></div>
+        <div class="panel">
+          <div class="panel-head"><h2>Alertas</h2><span class="muted mono" style="font-size:12px">próximas 48 h</span></div>
+          <div class="alerts" id="alerts"></div>
+        </div>
+      </div>
+
+      <div class="grid g-stats" id="stats"></div>
+
+      <div class="grid g-panel">
+        <div class="panel">
+          <div class="panel-head"><h2>Hoy</h2><span class="muted mono" id="todayCount" style="font-size:12px"></span></div>
+          <div class="tl" id="todayTl"></div>
+          <div class="panel-head" style="margin:22px 0 10px"><h2>Próximos 7 días</h2></div>
+          <div class="tl" id="weekTl"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Resumen de la mañana</h2>
+            <div style="display:flex;gap:6px">
+              <button class="btn sm" id="speakBrief" hidden><svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4zM15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>Escuchar</button>
+              <button class="btn sm primary" id="genBrief">Generar</button>
+            </div>
+          </div>
+          <div class="brief" id="brief"></div>
+          <p class="muted" style="font-size:12.5px;margin:14px 0 0">Junta tus citas de hoy, lo que viene mañana y los correos sin leer en un solo resumen.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CALENDARIO ================= -->
+    <section class="view" id="v-calendario" hidden>
+      <div class="view-head">
+        <div><div class="eyebrow">Agenda mensual</div><h1>Calendario</h1></div>
+        <div class="cal-bar">
+          <button class="icon-btn" id="calPrev" aria-label="Mes anterior"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <div class="cal-month" id="calMonth"></div>
+          <button class="icon-btn" id="calNext" aria-label="Mes siguiente"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="btn sm ghost" id="calToday">Hoy</button>
+        </div>
+      </div>
+      <div class="cal-wrap">
+        <div style="min-width:0">
+          <div class="cal" id="cal"></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+            <span class="chip t-cita">Cita</span><span class="chip t-compromiso">Compromiso</span><span class="chip t-viaje">Viaje</span><span class="chip t-llamada">Llamada</span><span class="chip t-personal">Personal</span>
+          </div>
+        </div>
+        <div class="side">
+          <div class="panel">
+            <div class="panel-head"><h2 id="selLabel">Día</h2></div>
+            <div class="ev-list" id="dayList"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2 id="formTitle">Agregar a este día</h2><button class="btn sm ghost" id="formCancel" type="button" hidden>Cancelar</button></div>
+            <form class="fx" id="evForm" autocomplete="off">
+              <label class="f">Título<input class="i" id="fTitle" required placeholder="Reunión con…"></label>
+              <div class="row">
+                <label class="f">Tipo<select class="i" id="fType"><option value="cita">Cita</option><option value="compromiso">Compromiso</option><option value="viaje">Viaje</option><option value="llamada">Llamada</option><option value="personal">Personal</option></select></label>
+                <label class="f">Fecha<input class="i" id="fDate" type="date" required></label>
+              </div>
+              <div class="row">
+                <label class="f">Hora<input class="i" id="fTime" type="time" value="09:00"></label>
+                <label class="f">Duración (min)<input class="i" id="fDur" type="number" min="5" step="5" value="60"></label>
+              </div>
+              <div class="row">
+                <label class="f">Ciudad<select class="i" id="fCity"></select></label>
+                <label class="f">Lugar<input class="i" id="fPlace" placeholder="Dirección o sitio"></label>
+              </div>
+              <label class="f">Con quién<input class="i" id="fContact" placeholder="Nombre / teléfono"></label>
+              <label class="f">Notas<textarea class="i" id="fNotes" placeholder="Qué llevar, qué preparar…"></textarea></label>
+              <button class="btn primary" type="submit" id="fSubmit">Guardar en el calendario</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MAPA ================= -->
+    <section class="view" id="v-mapa" hidden>
+      <div class="view-head">
+        <div><div class="eyebrow">Ruta del mes · Colombia</div><h1>Mapa de viajes</h1></div>
+        <div class="cal-bar">
+          <button class="icon-btn" id="mapPrev" aria-label="Mes anterior"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <div class="cal-month" id="mapMonth"></div>
+          <button class="icon-btn" id="mapNext" aria-label="Mes siguiente"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+          <label class="f" style="flex-direction:row;align-items:center;gap:8px;margin-left:8px">Base<select class="i" id="homeCity" style="width:auto"></select></label>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <div class="globe-box" id="globeBox">
+          <canvas id="globe" aria-label="Globo 3D con la ruta de tus citas en Colombia"></canvas>
+          <div class="labels" id="labels"></div>
+          <div class="globe-hud">
+            <div class="hud-card"><div class="lab">Recorrido</div><div class="val" id="hudKm">0 km</div></div>
+            <div class="hud-card"><div class="lab">Ciudades</div><div class="val" id="hudCities">0</div></div>
+            <div class="hud-card"><div class="lab">En movimiento</div><div class="val" id="hudHrs">0 h</div></div>
+          </div>
+          <div class="globe-ctrl">
+            <button class="icon-btn" id="zIn" aria-label="Acercar" style="background:rgba(6,10,19,.7)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="icon-btn" id="zOut" aria-label="Alejar" style="background:rgba(6,10,19,.7)"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+            <button class="icon-btn" id="zReset" aria-label="Centrar en Colombia" style="background:rgba(6,10,19,.7)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Itinerario</h2><span class="muted mono" style="font-size:12px" id="legCount"></span></div>
+          <div class="legs" id="legs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ASISTENTE ================= -->
+    <section class="view" id="v-asistente" hidden>
+      <div class="view-head">
+        <div><div class="eyebrow">Inteligencia artificial</div><h1>Asistente Órbita</h1></div>
+        <button class="btn sm ghost" id="chatClear">Nueva conversación</button>
+      </div>
+      <div class="panel chat">
+        <div class="msgs" id="msgs"></div>
+        <div class="sugs" id="sugs"></div>
+        <div class="composer">
+          <button class="icon-btn mic" id="mic" aria-label="Dictar por voz" hidden style="width:44px;height:44px"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
+          <textarea class="i" id="chatIn" rows="1" placeholder="Ej: agéndame una cita con el dentista el jueves a las 3 pm en Medellín"></textarea>
+          <button class="btn primary" id="chatSend">Enviar</button>
+          <button class="btn" id="chatStop" hidden>Detener</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LLAMADAS ================= -->
+    <section class="view" id="v-llamadas" hidden>
+      <div class="view-head">
+        <div><div class="eyebrow">Agente de llamadas</div><h1>Llamadas para agendar</h1></div>
+      </div>
+      <div class="grid g-two">
+        <div class="panel">
+          <div class="panel-head"><h2>Nueva llamada</h2></div>
+          <form class="fx" id="callForm" autocomplete="off">
+            <label class="f">A quién llamar<input class="i" id="cName" required placeholder="Consultorio Dra. Pérez"></label>
+            <label class="f">Teléfono<input class="i" id="cPhone" required placeholder="+57 300 000 0000" inputmode="tel"></label>
+            <label class="f">Para qué<input class="i" id="cGoal" required placeholder="Agendar control de ortodoncia"></label>
+            <label class="f">Cuándo me sirve<input class="i" id="cWindow" placeholder="Martes o jueves en la tarde, próxima semana"></label>
+            <label class="f">Ciudad de la cita<select class="i" id="cCity"></select></label>
+            <button class="btn primary" type="submit" id="cSubmit">Preparar llamada con IA</button>
+          </form>
+          <p class="note" style="margin:14px 0 0">La IA revisa tus espacios libres y escribe el guion con horarios que sí te sirven. Para que marque sola, la app necesita conectarse a un servicio de voz; mientras tanto llamas tú con el guion y registras el resultado, y la cita entra al calendario.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Cola de llamadas</h2><span class="muted mono" id="callCount" style="font-size:12px"></span></div>
+          <div class="ev-list" id="calls"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CORREO ================= -->
+    <section class="view" id="v-correo" hidden>
+      <div class="view-head">
+        <div><div class="eyebrow">Bandeja unificada</div><h1>Correo</h1></div>
+        <button class="btn primary" id="mailScan"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>Buscar compromisos con IA</button>
+      </div>
+      <div class="grid g-two">
+        <div class="panel">
+          <div class="panel-head"><h2>Agregar un correo</h2></div>
+          <form class="fx" id="mailForm" autocomplete="off">
+            <label class="f">De<input class="i" id="mFrom" required placeholder="banco@…, jefe@…"></label>
+            <label class="f">Asunto<input class="i" id="mSubj" required></label>
+            <label class="f">Contenido<textarea class="i" id="mBody" rows="5" placeholder="Pega aquí el texto del correo"></textarea></label>
+            <button class="btn" type="submit">Guardar en la bandeja</button>
+          </form>
+          <div id="found" class="ev-list" style="margin-top:16px"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Bandeja</h2><span class="muted mono" id="mailCount" style="font-size:12px"></span></div>
+          <div id="mails"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+"use strict";
+/* =========================================================
+   Datos de referencia
+   ========================================================= */
+const CITIES = {
+  "Bogotá":[4.711,-74.072],"Medellín":[6.244,-75.581],"Cali":[3.452,-76.532],"Barranquilla":[10.964,-74.796],
+  "Cartagena":[10.391,-75.479],"Bucaramanga":[7.119,-73.122],"Pereira":[4.813,-75.696],"Manizales":[5.067,-75.517],
+  "Armenia":[4.533,-75.681],"Santa Marta":[11.240,-74.199],"Cúcuta":[7.894,-72.507],"Ibagué":[4.438,-75.232],
+  "Villavicencio":[4.142,-73.627],"Pasto":[1.213,-77.281],"Neiva":[2.927,-75.281],"Montería":[8.748,-75.881],
+  "Popayán":[2.444,-76.614],"Valledupar":[10.463,-73.253],"Tunja":[5.535,-73.367],"Sincelejo":[9.304,-75.397],
+  "Riohacha":[11.544,-72.907],"Quibdó":[5.692,-76.658],"Yopal":[5.337,-72.395],"Florencia":[1.614,-75.606],
+  "Leticia":[-4.215,-69.940],"Rionegro":[6.155,-75.374],"Girardot":[4.303,-74.804],"San Andrés":[12.584,-81.700]
+};
+// Contorno simplificado de Colombia continental (lon, lat)
+const COL = [[-71.98,12.44],[-71.2,12.05],[-71.3,11.65],[-72.25,11.15],[-72.9,10.45],[-73.05,9.7],[-72.8,9.1],[-72.4,8.4],[-72.45,7.45],[-71.9,7.05],[-70.1,7.0],[-69.4,6.1],[-67.5,6.2],[-67.85,5.4],[-67.8,4.5],[-67.6,3.7],[-67.3,3.2],[-67.85,2.85],[-67.2,2.2],[-67.1,1.15],[-68.2,1.75],[-69.5,1.05],[-69.85,1.7],[-70.05,0.6],[-69.45,0.0],[-69.6,-0.6],[-69.4,-1.2],[-69.95,-4.22],[-70.5,-3.8],[-70.05,-2.75],[-71.5,-2.25],[-72.9,-2.45],[-73.6,-1.3],[-74.8,-0.2],[-75.6,-0.1],[-76.3,0.4],[-77.4,0.4],[-78.8,1.4],[-78.6,2.6],[-77.6,3.4],[-77.1,3.9],[-77.4,4.6],[-77.35,5.6],[-77.5,6.6],[-77.9,7.25],[-77.3,7.9],[-77.4,8.65],[-76.85,8.65],[-76.85,8.1],[-76.2,9.3],[-75.6,10.5],[-74.85,11.05],[-74.2,11.3],[-73.3,11.3],[-72.2,11.9],[-71.98,12.44]];
+const TYPE_LABEL = {cita:"Cita",compromiso:"Compromiso",viaje:"Viaje",llamada:"Llamada",personal:"Personal"};
+const TYPE_COLOR = {cita:"#6FD0FF",compromiso:"#F4B740",viaje:"#B794FF",llamada:"#43D6A0",personal:"#FF8FB1"};
+const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const DOWS = ["lun","mar","mié","jue","vie","sáb","dom"];
+
+/* =========================================================
+   Utilidades
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parseYmd = s => { const [y,m,d] = String(s).split("-").map(Number); return new Date(y,(m||1)-1,d||1); };
+const evStart = e => { const d = parseYmd(e.date); const [h,mi] = String(e.time||"00:00").split(":").map(Number); d.setHours(h||0,mi||0,0,0); return d; };
+const fmtDay = d => d.toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"});
+const fmtShort = d => d.toLocaleDateString("es-CO",{weekday:"short",day:"numeric",month:"short"});
+const fmtTime = t => { if(!t) return "Todo el día"; const [h,m]=t.split(":").map(Number); const ap=h>=12?"p. m.":"a. m."; return ((h%12)||12)+":"+pad(m)+" "+ap; };
+function haversine(a,b){ const R=6371, toR=x=>x*Math.PI/180; const dLat=toR(b[0]-a[0]), dLon=toR(b[1]-a[1]); const h=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function travel(km){ if(km<1) return {mode:"local",hrs:0}; if(km>350) return {mode:"Vuelo",hrs:1.6+km/650}; return {mode:"Carretera",hrs:km*1.35/52}; }
+const fmtH = h => h<1 ? Math.round(h*60)+" min" : (Math.floor(h)+" h "+(Math.round((h%1)*60) ? Math.round((h%1)*60)+" min":"")).trim();
+function toast(msg, urgent){ const t=document.createElement("div"); t.className="toast"+(urgent?" urgent":""); t.textContent=msg; $("#toasts").appendChild(t); setTimeout(()=>t.remove(), urgent?9000:4200); }
+function cityOpts(sel, withNone){ sel.innerHTML=(withNone?'<option value="">— Sin ciudad —</option>':"")+Object.keys(CITIES).sort((a,b)=>a.localeCompare(b,"es")).map(c=>`<option>${esc(c)}</option>`).join(""); }
+
+/* =========================================================
+   Almacenamiento: base de datos del artifact, con respaldo local
+   ========================================================= */
+const SUPA_URL = 'https://llyovzgwdqoeunvyczcy.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxseW92emd3ZHFvZXVudnljemN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0MzUzNjcsImV4cCI6MjEwNjAxMTM2N30.g1DgUdTGPHDz8HEI1Kgv4SOJ13zyOwOfcAp8Ak2BRGQ';
+const S = { events:[], emails:[], calls:[], mode:"local", ready:false };
+const COLLS = ["events","emails","calls"];
+let supa = null, session = null, channel = null;
+const LKEY = "orbita.cache.v1", QKEY = "orbita.pendientes.v1";
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem(LKEY)||"null"); if(j){ COLLS.forEach(c=>S[c]=j[c]||[]); } }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(LKEY, JSON.stringify({events:S.events,emails:S.emails,calls:S.calls})); }catch(e){} }
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+// Cola de cambios pendientes: si no hay internet, nada se pierde; se sube al volver la conexión.
+let queue = {};
+try{ queue = JSON.parse(localStorage.getItem(QKEY)||"{}")||{}; }catch(e){ queue={}; }
+function saveQueue(){ try{ localStorage.setItem(QKEY, JSON.stringify(queue)); }catch(e){} }
+async function push(row){
+  queue[row.coleccion+"/"+row.id] = row; saveQueue(); setSync();
+  await flush();
+}
+let flushing = false;
+async function flush(){
+  if(!supa || !session || flushing) return;
+  const rows = Object.values(queue); if(!rows.length) return;
+  flushing = true;
+  try{
+    const { error } = await supa.from("orb_items").upsert(rows, { onConflict: "user_id,coleccion,id" });
+    if(!error){ rows.forEach(r=>{ const k=r.coleccion+"/"+r.id; if(queue[k]===r) delete queue[k]; }); saveQueue(); }
+    else console.warn(error);
+  }catch(e){ console.warn(e); }
+  flushing = false; setSync();
+}
+window.addEventListener("online", flush);
+setInterval(flush, 60000);
+function rowFor(coll, item, deleted){ const {id, ...data} = item; return { coleccion: coll, id, data, deleted_at: deleted ? new Date().toISOString() : null }; }
+async function addDoc(coll, data){
+  const id = uid(); const item = {id, ...data, createdAt: Date.now()};
+  S[coll].push(item); saveLocal(); renderAll();
+  await push(rowFor(coll, item)); return id;
+}
+async function updDoc(coll, id, patch){
+  const it = S[coll].find(x=>x.id===id); if(!it) return;
+  Object.assign(it, patch); saveLocal(); renderAll();
+  await push(rowFor(coll, it));
+}
+async function delDoc(coll, id){
+  const it = S[coll].find(x=>x.id===id); if(!it) return;
+  S[coll] = S[coll].filter(x=>x.id!==id); saveLocal(); renderAll();
+  await push(rowFor(coll, it, true));
+}
+function applyRow(r){
+  const c = r.coleccion; if(!S[c]) return;
+  if(queue[c+"/"+r.id]) return; // hay un cambio local más nuevo esperando subir
+  const i = S[c].findIndex(x=>x.id===r.id);
+  if(r.deleted_at){ if(i>=0) S[c].splice(i,1); return; }
+  const it = {id:r.id, ...r.data};
+  if(i>=0) S[c][i]=it; else S[c].push(it);
+}
+function setSync(){
+  const el=$("#syncState"); const n=Object.keys(queue).length;
+  const who = session && session.user ? esc(session.user.email||"") : "";
+  el.innerHTML = (S.mode==="db" ? (n ? '<span class="dot off"></span>'+n+' cambio(s) por subir' : '<span class="dot"></span>Sincronizado en la nube') : '<span class="dot off"></span>Sin conexión a la nube')
+    + '<br><b>'+S.events.length+'</b> eventos' + (who ? '<br><span style="font-size:11px">'+who+'</span><br><button class="btn sm ghost" id="logout" type="button">Cerrar sesión</button>' : '');
+  const lo = $("#logout"); if(lo) lo.onclick = async ()=>{ await supa.auth.signOut(); };
+}
+async function loadAll(){
+  const out = {events:[],emails:[],calls:[]}; let from = 0;
+  for(;;){
+    const { data, error } = await supa.from("orb_items").select("coleccion,id,data,deleted_at").is("deleted_at", null).range(from, from+999);
+    if(error) throw error;
+    data.forEach(r=>{ if(out[r.coleccion]) out[r.coleccion].push({id:r.id, ...r.data}); });
+    if(data.length < 1000) break; from += 1000;
+  }
+  COLLS.forEach(c=>S[c]=out[c]);
+  Object.values(queue).forEach(applyQueued);
+}
+function applyQueued(r){ const c=r.coleccion; const i=S[c].findIndex(x=>x.id===r.id); if(r.deleted_at){ if(i>=0) S[c].splice(i,1); return; } const it={id:r.id,...r.data}; if(i>=0) S[c][i]=it; else S[c].push(it); }
+async function onLogin(s){
+  session = s; $("#login").hidden = true;
+  try{
+    await flush(); await loadAll(); S.mode = "db"; saveLocal();
+  }catch(e){ console.warn(e); S.mode = "local"; toast("No pude leer la nube. Muestro la copia guardada en este dispositivo.", true); }
+  renderAll();
+  if(channel) supa.removeChannel(channel);
+  channel = supa.channel("orbita-"+s.user.id)
+    .on("postgres_changes", { event:"*", schema:"public", table:"orb_items", filter:"user_id=eq."+s.user.id }, p=>{ if(p.new && p.new.coleccion){ applyRow(p.new); saveLocal(); renderAll(); } })
+    .subscribe();
+}
+function showLogin(){ session = null; S.mode = "local"; $("#login").hidden = false; setSync(); }
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault(); $("#lErr").textContent=""; $("#lBtn").disabled=true;
+  const { data, error } = await supa.auth.signInWithPassword({ email: $("#lEmail").value.trim(), password: $("#lPass").value });
+  $("#lBtn").disabled=false;
+  if(error){ $("#lErr").textContent = "Correo o contraseña incorrectos."; return; }
+  onLogin(data.session);
+});
+async function initStore(){
+  loadLocal(); renderAll();
+  if(!window.supabase){ toast("No se pudo cargar la conexión a la nube. Revisa el internet.", true); return; }
+  supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+  supa.auth.onAuthStateChange((ev, s)=>{ if(ev==="SIGNED_OUT"){ COLLS.forEach(c=>S[c]=[]); saveLocal(); showLogin(); renderAll(); } else if(s){ session = s; } });
+  const { data } = await supa.auth.getSession();
+  if(data && data.session) await onLogin(data.session); else showLogin();
+}
+
+/* =========================================================
+   Navegación
+   ========================================================= */
+const VIEWS = ["panel","calendario","mapa","asistente","llamadas","correo"];
+let current = "panel";
+function route(){
+  const h = (location.hash||"").slice(1);
+  current = VIEWS.includes(h) ? h : "panel";
+  VIEWS.forEach(v=>{ $("#v-"+v).hidden = v!==current; });
+  document.querySelectorAll(".nav a").forEach(a=>a.setAttribute("aria-current", a.dataset.v===current?"page":"false"));
+  if(current==="mapa") Globe.start(); else Globe.stop();
+  renderAll();
+  window.scrollTo(0,0);
+}
+window.addEventListener("hashchange", route);
+
+/* =========================================================
+   Selectores de datos
+   ========================================================= */
+const sorted = () => [...S.events].sort((a,b)=>evStart(a)-evStart(b));
+const onDay = ds => sorted().filter(e=>e.date===ds);
+const isEx = e => !!e.example;
+
+/* =========================================================
+   PANEL
+   ========================================================= */
+function renderPanel(){
+  const now = new Date();
+  const h = now.getHours();
+  $("#greet").textContent = h<12 ? "Buenos días" : h<19 ? "Buenas tardes" : "Buenas noches";
+  $("#todayLabel").textContent = fmtDay(now);
+  const all = sorted();
+  const upcoming = all.filter(e=>!e.done && evStart(e) >= new Date(now.getTime()-30*60000));
+  const nx = upcoming.find(e=>evStart(e)>=now) || upcoming[0];
+  const nc = $("#nextCard");
+  if(!nx){
+    nc.innerHTML = `<div class="eyebrow">Próximo compromiso</div><div class="next-title">Tu agenda está libre</div><p class="muted">Agrega una cita en el calendario o dile al asistente qué tienes pendiente.</p><a class="btn primary" href="#calendario">Agregar la primera cita</a>`;
+  } else {
+    const ms = Math.max(0, evStart(nx)-now);
+    const d = Math.floor(ms/864e5), hh = Math.floor(ms%864e5/36e5), mm = Math.floor(ms%36e5/6e4);
+    nc.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="eyebrow">Próximo compromiso</span><span class="chip t-${esc(nx.type)}">${TYPE_LABEL[nx.type]||"Cita"}</span>${isEx(nx)?'<span class="example-tag">EJEMPLO</span>':""}</div>
+      <div class="next-title">${esc(nx.title)}</div>
+      <div class="meta"><span>${fmtDay(evStart(nx))}</span><span class="mono">${fmtTime(nx.time)}</span>${nx.city?`<span>${esc(nx.city)}${nx.place?" · "+esc(nx.place):""}</span>`:""}${nx.contact?`<span>${esc(nx.contact)}</span>`:""}</div>
+      <div class="count"><div><b>${d}</b><span>días</span></div><div><b>${pad(hh)}</b><span>horas</span></div><div><b>${pad(mm)}</b><span>min</span></div></div>`;
+  }
+  // alertas
+  const in48 = upcoming.filter(e=>evStart(e)-now < 48*36e5);
+  const al = [];
+  in48.forEach(e=>{ const m=(evStart(e)-now)/6e4; al.push({c: m<120?"var(--bad)":"var(--gold)", t:`${m<0?"En curso":m<60?"En "+Math.round(m)+" min":m<1440?"Hoy "+fmtTime(e.time):"Mañana "+fmtTime(e.time)} · ${e.title}${e.city?" ("+e.city+")":""}`}); });
+  const overdue = all.filter(e=>!e.done && evStart(e) < new Date(now.getTime()-60*60000) && (now-evStart(e))<7*864e5);
+  overdue.forEach(e=>al.push({c:"var(--warn)", t:`Sin confirmar: ${e.title} (${fmtShort(evStart(e))}). ¿Asististe?`, id:e.id}));
+  routeLegs(now.getFullYear(), now.getMonth()).filter(l=>l.warn).forEach(l=>al.push({c:"var(--bad)",t:l.warn}));
+  S.calls.filter(c=>c.status==="ready").forEach(c=>al.push({c:"var(--t-llamada)",t:`Llamada pendiente: ${c.name}`}));
+  $("#alerts").innerHTML = al.length ? al.slice(0,7).map(a=>`<div class="alert"><i style="background:${a.c};box-shadow:0 0 8px ${a.c}"></i><div style="flex:1;min-width:0">${esc(a.t)}</div>${a.id?`<button class="btn sm" data-done="${esc(a.id)}">Sí, hecho</button>`:""}</div>`).join("") : `<div class="empty">Nada urgente. Todo bajo control.</div>`;
+  // stats
+  const y=now.getFullYear(), mo=now.getMonth();
+  const monthEv = all.filter(e=>{const d=parseYmd(e.date);return d.getFullYear()===y&&d.getMonth()===mo;});
+  const legs = routeLegs(y,mo);
+  const km = legs.reduce((s,l)=>s+(l.km||0),0);
+  const cities = new Set(monthEv.map(e=>e.city).filter(Boolean));
+  const doneN = monthEv.filter(e=>e.done).length;
+  $("#stats").innerHTML = [
+    ["Este mes", monthEv.length, "citas y compromisos"],
+    ["Pendientes", monthEv.filter(e=>!e.done && evStart(e)>=now).length, "por asistir"],
+    ["Ciudades", cities.size, [...cities].slice(0,3).join(", ")||"sin viajes"],
+    ["Ruta del mes", Math.round(km).toLocaleString("es-CO")+" km", doneN+" cumplidos"]
+  ].map(s=>`<div class="panel stat"><div class="lab">${s[0]}</div><div class="val">${s[1]}</div><div class="sub">${esc(s[2])}</div></div>`).join("");
+  // timelines
+  const tdy = onDay(ymd(now));
+  $("#todayCount").textContent = tdy.length+" en agenda";
+  $("#todayTl").innerHTML = tdy.length ? tdy.map(tlItem).join("") : `<div class="empty">Hoy no tienes nada agendado.</div>`;
+  const wk = all.filter(e=>{ const d=evStart(e); return d>new Date(ymd(now)+"T23:59:59") && d-now<8*864e5; });
+  $("#weekTl").innerHTML = wk.length ? wk.map(e=>tlItem(e,true)).join("") : `<div class="empty">Semana despejada.</div>`;
+  if(!$("#brief").textContent) $("#brief").innerHTML = `<span class="muted">Toca “Generar” y la IA arma tu resumen del día.</span>`;
+}
+function tlItem(e, withDate){
+  return `<div class="tl-item ${e.done?"done":""}"><div class="tl-time">${withDate?fmtShort(evStart(e)).replace(".",""):(e.time||"—")}</div><div class="tl-dot t-${esc(e.type)}"></div>
+  <div class="tl-body"><div class="t">${esc(e.title)} ${isEx(e)?'<span class="example-tag">EJEMPLO</span>':""}</div><div class="s">${withDate?fmtTime(e.time)+" · ":""}${esc(TYPE_LABEL[e.type]||"")}${e.city?" · "+esc(e.city):""}${e.place?" · "+esc(e.place):""}</div></div>
+  <button class="icon-btn" data-toggle="${esc(e.id)}" aria-label="${e.done?"Marcar pendiente":"Marcar cumplido"}" title="${e.done?"Marcar pendiente":"Marcar cumplido"}"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></button></div>`;
+}
+document.addEventListener("click", ev=>{
+  const t = ev.target.closest("[data-toggle],[data-done],[data-edit],[data-del],[data-day]");
+  if(!t) return;
+  if(t.dataset.toggle){ const e=S.events.find(x=>x.id===t.dataset.toggle); if(e) updDoc("events",e.id,{done:!e.done}); }
+  if(t.dataset.done){ updDoc("events",t.dataset.done,{done:true}); toast("Marcado como cumplido."); }
+  if(t.dataset.edit) startEdit(t.dataset.edit);
+  if(t.dataset.del){ if(t.dataset.armed){ delDoc("events",t.dataset.del); toast("Evento eliminado."); } else { t.dataset.armed="1"; t.style.color="var(--bad)"; t.style.borderColor="var(--bad)"; t.title="Toca otra vez para eliminar"; toast("Toca otra vez la papelera para eliminar."); setTimeout(()=>{ delete t.dataset.armed; t.style.color=""; t.style.borderColor=""; },3000); } }
+  if(t.dataset.day){ selDay = t.dataset.day; const d=parseYmd(selDay); if(d.getMonth()!==calM.getMonth()) calM=new Date(d.getFullYear(),d.getMonth(),1); if(!editing) $("#fDate").value=selDay; renderCal(); }
+});
+
+/* =========================================================
+   CALENDARIO
+   ========================================================= */
+let calM = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selDay = ymd(new Date());
+let editing = null;
+function renderCal(){
+  $("#calMonth").textContent = MONTHS[calM.getMonth()]+" "+calM.getFullYear();
+  const first = new Date(calM); const offset = (first.getDay()+6)%7;
+  const start = new Date(first); start.setDate(1-offset);
+  const today = ymd(new Date());
+  let html = DOWS.map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let i=0;i<42;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    if(i>=35 && d.getMonth()!==calM.getMonth()) break;
+    const ds = ymd(d), evs = onDay(ds);
+    html += `<button type="button" class="day ${d.getMonth()!==calM.getMonth()?"out":""} ${ds===today?"today":""} ${ds===selDay?"sel":""}" data-day="${ds}" aria-label="${fmtDay(d)}, ${evs.length} eventos">
+      <span class="n"><b>${d.getDate()}</b>${evs.some(e=>e.city&&e.type==="viaje")?'<span style="color:var(--t-viaje)">✈</span>':""}</span>
+      ${evs.slice(0,3).map(e=>`<span class="ev t-${esc(e.type)}">${esc((e.time||"")+" "+e.title)}</span>`).join("")}
+      ${evs.length>3?`<span class="more">+${evs.length-3} más</span>`:""}</button>`;
+  }
+  $("#cal").innerHTML = html;
+  $("#selLabel").textContent = fmtDay(parseYmd(selDay));
+  const list = onDay(selDay);
+  $("#dayList").innerHTML = list.length ? list.map(e=>`<div class="ev-card t-${esc(e.type)}"><div class="bar"></div><div class="body"><div style="font-weight:700;color:var(--fg)">${esc(e.title)} ${isEx(e)?'<span class="example-tag">EJEMPLO</span>':""}</div><div class="muted" style="font-size:12.5px">${fmtTime(e.time)} · ${e.duration||60} min${e.city?" · "+esc(e.city):""}${e.place?" · "+esc(e.place):""}</div>${e.contact?`<div class="muted" style="font-size:12.5px">Con: ${esc(e.contact)}</div>`:""}${e.notes?`<div style="font-size:12.5px;color:var(--fg);opacity:.8;margin-top:3px">${esc(e.notes)}</div>`:""}</div>
+    <div class="acts"><button class="icon-btn" data-edit="${esc(e.id)}" aria-label="Editar"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button><button class="icon-btn" data-del="${esc(e.id)}" aria-label="Eliminar"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button></div></div>`).join("") : `<div class="empty">Día libre. Usa el formulario para agregar algo.</div>`;
+}
+function startEdit(id){
+  const e = S.events.find(x=>x.id===id); if(!e) return;
+  editing = id;
+  if(current!=="calendario") location.hash="#calendario";
+  $("#fTitle").value=e.title||""; $("#fType").value=e.type||"cita"; $("#fDate").value=e.date; $("#fTime").value=e.time||""; $("#fDur").value=e.duration||60; $("#fCity").value=e.city||""; $("#fPlace").value=e.place||""; $("#fContact").value=e.contact||""; $("#fNotes").value=e.notes||"";
+  $("#formTitle").textContent="Editar evento"; $("#fSubmit").textContent="Guardar cambios"; $("#formCancel").hidden=false;
+  $("#fTitle").focus();
+}
+function resetForm(){ editing=null; $("#evForm").reset(); $("#fDate").value=selDay; $("#fTime").value="09:00"; $("#fDur").value=60; $("#fCity").value=""; $("#formTitle").textContent="Agregar a este día"; $("#fSubmit").textContent="Guardar en el calendario"; $("#formCancel").hidden=true; }
+$("#formCancel").onclick = resetForm;
+$("#evForm").addEventListener("submit", async ev=>{
+  ev.preventDefault();
+  const data = { title:$("#fTitle").value.trim(), type:$("#fType").value, date:$("#fDate").value, time:$("#fTime").value, duration:Number($("#fDur").value)||60, city:$("#fCity").value, place:$("#fPlace").value.trim(), contact:$("#fContact").value.trim(), notes:$("#fNotes").value.trim() };
+  if(!data.title||!data.date) return;
+  const clash = findClash(data, editing);
+  try{
+    if(editing){ await updDoc("events",editing,data); toast("Cambios guardados."); }
+    else { await addDoc("events",{...data,done:false}); toast("Agendado: "+data.title+" · "+fmtShort(parseYmd(data.date))); }
+    if(clash) toast("Ojo: se cruza con “"+clash.title+"” a las "+clash.time+".", true);
+    selDay = data.date; resetForm(); renderAll();
+  }catch(e){ toast("No se pudo guardar. Revisa la conexión e intenta de nuevo.", true); }
+});
+function findClash(d, skipId){
+  if(!d.time) return null;
+  const s = evStart(d), e = new Date(s.getTime()+(d.duration||60)*6e4);
+  return S.events.find(x=>x.id!==skipId && x.date===d.date && x.time && evStart(x)<e && new Date(evStart(x).getTime()+(x.duration||60)*6e4)>s) || null;
+}
+$("#calPrev").onclick=()=>{calM=new Date(calM.getFullYear(),calM.getMonth()-1,1);renderCal();};
+$("#calNext").onclick=()=>{calM=new Date(calM.getFullYear(),calM.getMonth()+1,1);renderCal();};
+$("#calToday").onclick=()=>{const n=new Date();calM=new Date(n.getFullYear(),n.getMonth(),1);selDay=ymd(n);renderCal();};
+
+/* =========================================================
+   RUTA
+   ========================================================= */
+let homeCity = "Bogotá";
+try{ homeCity = localStorage.getItem("orbita.home") || "Bogotá"; }catch(e){}
+function routeLegs(y, m){
+  const evs = sorted().filter(e=>{const d=parseYmd(e.date);return d.getFullYear()===y&&d.getMonth()===m&&e.city&&CITIES[e.city];});
+  const stops = []; let last = homeCity;
+  stops.push({home:true, city:homeCity});
+  evs.forEach(e=>{
+    const prev = stops[stops.length-1];
+    if(prev.city===e.city && !prev.home){ prev.events.push(e); return; }
+    if(prev.home && prev.city===e.city){ prev.events = (prev.events||[]).concat(e); return; }
+    stops.push({city:e.city, events:[e]});
+  });
+  if(stops.length>1 && stops[stops.length-1].city!==homeCity) stops.push({home:true, ret:true, city:homeCity});
+  const legs = [];
+  for(let i=0;i<stops.length;i++){
+    const s = stops[i], p = stops[i-1];
+    const leg = {...s};
+    if(p){
+      leg.km = haversine(CITIES[p.city], CITIES[s.city]);
+      const t = travel(leg.km); leg.mode=t.mode; leg.hrs=t.hrs;
+      const prevEnd = p.events&&p.events.length ? (()=>{const l=p.events[p.events.length-1];return new Date(evStart(l).getTime()+(l.duration||60)*6e4);})() : null;
+      if(prevEnd && s.events && s.events.length){
+        const gapH = (evStart(s.events[0])-prevEnd)/36e5;
+        if(gapH < t.hrs) leg.warn = `Tiempo insuficiente: de ${p.city} a ${s.city} necesitas ~${fmtH(t.hrs)} y solo tienes ${fmtH(Math.max(0,gapH))}.`;
+      }
+    }
+    legs.push(leg);
+  }
+  return legs.length>1 ? legs : [];
+}
+let mapM = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+function renderMap(){
+  $("#mapMonth").textContent = MONTHS[mapM.getMonth()]+" "+mapM.getFullYear();
+  const legs = routeLegs(mapM.getFullYear(), mapM.getMonth());
+  const km = legs.reduce((s,l)=>s+(l.km||0),0), hrs = legs.reduce((s,l)=>s+(l.hrs||0),0);
+  $("#hudKm").textContent = Math.round(km).toLocaleString("es-CO")+" km";
+  $("#hudCities").textContent = new Set(legs.filter(l=>!l.home).map(l=>l.city)).size;
+  $("#hudHrs").textContent = hrs ? fmtH(hrs) : "0 h";
+  $("#legCount").textContent = legs.length ? (legs.filter(l=>!l.home).length+" paradas") : "";
+  let n=0;
+  $("#legs").innerHTML = legs.length ? legs.map(l=>{
+    const label = l.home ? (l.ret?"Regreso a "+l.city:"Salida desde "+l.city) : l.city;
+    return `<div class="leg"><div class="num ${l.home?"home":""}">${l.home?"⌂":++n}</div><div style="min-width:0">
+      ${l.km?`<div class="leg-move">${l.mode==="Vuelo"?"✈":"⟶"} ${l.mode} · ${Math.round(l.km)} km · ~${fmtH(l.hrs)}</div>`:""}
+      <div style="font-weight:700">${esc(label)}</div>
+      ${(l.events||[]).map(e=>`<div class="muted" style="font-size:13px">${fmtShort(evStart(e))} · ${fmtTime(e.time)} — ${esc(e.title)}</div>`).join("")}
+      ${l.warn?`<div class="leg-warn">⚠ ${esc(l.warn)}</div>`:""}</div></div>`;
+  }).join("") : `<div class="empty">No hay citas en otras ciudades este mes. Al agendar una cita con ciudad, la ruta aparece aquí y en el globo.</div>`;
+  Globe.setRoute(legs);
+}
+$("#mapPrev").onclick=()=>{mapM=new Date(mapM.getFullYear(),mapM.getMonth()-1,1);renderMap();};
+$("#mapNext").onclick=()=>{mapM=new Date(mapM.getFullYear(),mapM.getMonth()+1,1);renderMap();};
+$("#homeCity").onchange=e=>{homeCity=e.target.value;try{localStorage.setItem("orbita.home",homeCity);}catch(_){}renderAll();};
+
+/* =========================================================
+   GLOBO 3D
+   ========================================================= */
+const Globe = (function(){
+  let renderer, scene, camera, world, pivot, routeGroup, cityGroup, raf=0, running=false, ok=false;
+  let dist = 2.35, labels=[], movers=[], pulses=[];
+  const R = 1;
+  function v3(lat, lon, r){ const phi=(90-lat)*Math.PI/180, th=(lon+180)*Math.PI/180; return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(th), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(th)); }
+  function inPoly(x,y,poly){ let ins=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1]; if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+  function init(){
+    if(ok) return true;
+    if(!window.THREE){ $("#globeBox").insertAdjacentHTML("beforeend",'<div class="globe-fallback">No se pudo cargar el motor 3D. El itinerario de la derecha sigue funcionando.</div>'); return false; }
+    const cv = $("#globe");
+    try{ renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true}); }catch(e){ $("#globeBox").insertAdjacentHTML("beforeend",'<div class="globe-fallback">Tu dispositivo no tiene WebGL disponible. El itinerario sigue funcionando.</div>'); return false; }
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
+    pivot = new THREE.Group(); scene.add(pivot);
+    world = new THREE.Group(); pivot.add(world);
+    // núcleo
+    world.add(new THREE.Mesh(new THREE.SphereGeometry(R,96,96), new THREE.MeshBasicMaterial({color:0x08132A})));
+    // malla de puntos del planeta (tenue)
+    const gp=[]; const N=9000; for(let i=0;i<N;i++){ const y=1-2*(i+.5)/N, r=Math.sqrt(1-y*y), th=i*2.39996; gp.push(Math.cos(th)*r*1.001, y*1.001, Math.sin(th)*r*1.001); }
+    const gg=new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(gp,3));
+    world.add(new THREE.Points(gg, new THREE.PointsMaterial({color:0x2A4472, size:0.006, transparent:true, opacity:.55})));
+    // retícula
+    const gridMat = new THREE.LineBasicMaterial({color:0x1A2F55, transparent:true, opacity:.5});
+    for(let lat=-75; lat<=75; lat+=15){ const pts=[]; for(let lon=-180;lon<=180;lon+=3) pts.push(v3(lat,lon,R*1.0015)); world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat)); }
+    for(let lon=-180; lon<180; lon+=15){ const pts=[]; for(let lat=-90;lat<=90;lat+=3) pts.push(v3(lat,lon,R*1.0015)); world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat)); }
+    // Colombia: puntos dorados + borde
+    const cp=[], cc=[]; const gold=new THREE.Color(0xF4B740), ice=new THREE.Color(0x6FD0FF);
+    for(let lat=-4.3; lat<=12.6; lat+=0.16){ for(let lon=-79.1; lon<=-66.8; lon+=0.16){ if(inPoly(lon,lat,COL)){ const p=v3(lat,lon,R*1.002); cp.push(p.x,p.y,p.z); const k=(lat+4.3)/17; const c=ice.clone().lerp(gold, k*0.85+.15); cc.push(c.r,c.g,c.b); } } }
+    const cg=new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(cp,3)); cg.setAttribute("color", new THREE.Float32BufferAttribute(cc,3));
+    world.add(new THREE.Points(cg, new THREE.PointsMaterial({size:0.0042, vertexColors:true, transparent:true, opacity:.9})));
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(COL.map(p=>v3(p[1],p[0],R*1.003))), new THREE.LineBasicMaterial({color:0xF4B740, transparent:true, opacity:.85})));
+    // atmósfera
+    const atm = new THREE.ShaderMaterial({ transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false,
+      vertexShader:"varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+      fragmentShader:"varying vec3 vN; void main(){ float i=pow(0.72-dot(vN,vec3(0.,0.,1.)),3.0); gl_FragColor=vec4(0.30,0.70,1.0,1.0)*i; }" });
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.18,64,64), atm));
+    // estrellas
+    const sp=[]; for(let i=0;i<1400;i++){ const v=new THREE.Vector3().randomDirection ? new THREE.Vector3().randomDirection() : new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize(); v.multiplyScalar(20+Math.random()*20); sp.push(v.x,v.y,v.z); }
+    const sg=new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.Float32BufferAttribute(sp,3));
+    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color:0x9DB4DA, size:0.06, transparent:true, opacity:.6})));
+    // ciudades base (todas, tenues)
+    cityGroup = new THREE.Group(); world.add(cityGroup);
+    Object.entries(CITIES).forEach(([n,c])=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(0.0035,8,8), new THREE.MeshBasicMaterial({color:0x7E91B8})); m.position.copy(v3(c[0],c[1],R*1.003)); cityGroup.add(m); });
+    routeGroup = new THREE.Group(); world.add(routeGroup);
+    resetView();
+    bindControls(cv);
+    new ResizeObserver(resize).observe($("#globeBox"));
+    ok = true; resize(); return true;
+  }
+  let rotX=0, rotY=0, tX=0, tY=0, auto=true;
+  function resetView(){
+    const target = v3(4.6,-73.5,1).normalize();
+    world.quaternion.setFromUnitVectors(target, new THREE.Vector3(0,0,1));
+    rotX=rotY=tX=tY=0; dist=2.35; auto=true;
+  }
+  function bindControls(cv){
+    let drag=false, lx=0, ly=0;
+    cv.addEventListener("pointerdown",e=>{drag=true;auto=false;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId);});
+    cv.addEventListener("pointermove",e=>{ if(!drag) return; tY+=(e.clientX-lx)*0.005*(dist-1)/1.35; tX+=(e.clientY-ly)*0.005*(dist-1)/1.35; tX=Math.max(-1.2,Math.min(1.2,tX)); lx=e.clientX; ly=e.clientY; });
+    cv.addEventListener("pointerup",()=>drag=false); cv.addEventListener("pointercancel",()=>drag=false);
+    cv.addEventListener("wheel",e=>{ e.preventDefault(); dist=Math.max(1.35,Math.min(5,dist*(1+Math.sign(e.deltaY)*0.08))); },{passive:false});
+    $("#zIn").onclick=()=>dist=Math.max(1.35,dist*0.85);
+    $("#zOut").onclick=()=>dist=Math.min(5,dist*1.18);
+    $("#zReset").onclick=resetView;
+  }
+  function resize(){ if(!renderer) return; const b=$("#globeBox").getBoundingClientRect(); renderer.setSize(b.width,b.height,false); camera.aspect=b.width/Math.max(1,b.height); camera.updateProjectionMatrix(); }
+  function clearRoute(){ while(routeGroup.children.length){ const c=routeGroup.children.pop(); c.geometry&&c.geometry.dispose(); } labels.forEach(l=>l.el.remove()); labels=[]; movers=[]; pulses=[]; }
+  function setRoute(legs){
+    if(!ok) return; clearRoute();
+    const box=$("#labels"); const seen={};
+    let idx=0;
+    legs.forEach((l,i)=>{
+      const c=CITIES[l.city]; if(!c) return;
+      if(!seen[l.city]){
+        seen[l.city]=true;
+        const p=v3(c[0],c[1],R*1.004);
+        const col = l.home ? 0x6FD0FF : 0xF4B740;
+        const dot=new THREE.Mesh(new THREE.SphereGeometry(0.008,16,16), new THREE.MeshBasicMaterial({color:col})); dot.position.copy(p); routeGroup.add(dot);
+        const ring=new THREE.Mesh(new THREE.RingGeometry(0.010,0.013,40), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:.8, side:THREE.DoubleSide}));
+        ring.position.copy(p); ring.lookAt(p.clone().multiplyScalar(2)); routeGroup.add(ring); pulses.push({m:ring, o:Math.random()*Math.PI*2});
+        const el=document.createElement("div"); el.className="lbl"; el.innerHTML=(l.home?'<small style="color:var(--ice)">BASE</small>':`<small>${++idx}</small>`)+esc(l.city); box.appendChild(el);
+        labels.push({el, p});
+      }
+      if(i>0){
+        const a=CITIES[legs[i-1].city];
+        const A=v3(a[0],a[1],R*1.004), B=v3(c[0],c[1],R*1.004);
+        const lift = 1 + Math.min(0.25, A.distanceTo(B)*0.9) + 0.01;
+        const M=A.clone().add(B).multiplyScalar(.5).normalize().multiplyScalar(lift);
+        const curve=new THREE.QuadraticBezierCurve3(A,M,B);
+        const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,64,0.0016,8,false), new THREE.MeshBasicMaterial({color: l.mode==="Vuelo"?0x6FD0FF:0xF4B740, transparent:true, opacity:.85}));
+        routeGroup.add(tube);
+        const glow=new THREE.Mesh(new THREE.TubeGeometry(curve,64,0.005,8,false), new THREE.MeshBasicMaterial({color:0x6FD0FF, transparent:true, opacity:.12, blending:THREE.AdditiveBlending, depthWrite:false}));
+        routeGroup.add(glow);
+        const mv=new THREE.Mesh(new THREE.SphereGeometry(0.0055,12,12), new THREE.MeshBasicMaterial({color:0xFFFFFF})); routeGroup.add(mv);
+        movers.push({m:mv, c:curve, o:i*0.37});
+      }
+    });
+  }
+  function frame(t){
+    if(!running) return;
+    raf = requestAnimationFrame(frame);
+    if(auto) tY = Math.sin(t*0.00018)*0.22;
+    rotX += (tX-rotX)*0.12; rotY += (tY-rotY)*0.12;
+    pivot.rotation.set(rotX, rotY, 0);
+    camera.position.set(0,0,dist); camera.lookAt(0,0,0);
+    movers.forEach(mv=>{ const k=((t*0.00025+mv.o)%1); mv.m.position.copy(mv.c.getPoint(k)); });
+    pulses.forEach(p=>{ const s=1+((t*0.0012+p.o)%1)*1.6; p.m.scale.set(s,s,s); p.m.material.opacity=Math.max(0,.9-(s-1)/1.6); });
+    renderer.render(scene,camera);
+    const w=renderer.domElement.clientWidth, h=renderer.domElement.clientHeight;
+    labels.forEach(l=>{ const wp=l.p.clone().applyMatrix4(world.matrixWorld); const facing = wp.clone().normalize().dot(camera.position.clone().normalize())>0.15; const s=wp.project(camera); l.el.style.left=((s.x+1)/2*w)+"px"; l.el.style.top=((1-s.y)/2*h)+"px"; l.el.style.opacity=facing?1:0; });
+  }
+  return {
+    start(){ if(!init()) return; if(running) return; running=true; resize(); raf=requestAnimationFrame(frame); },
+    stop(){ running=false; cancelAnimationFrame(raf); },
+    setRoute
+  };
+})();
+
+/* =========================================================
+   IA (función orbita-ia en Supabase)
+   ========================================================= */
+const AI_URL = SUPA_URL + "/functions/v1/orbita-ia";
+const AI = { get ok(){ return !!session; } };
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const canSpeak = "speechSynthesis" in window;
+async function claudeCall(body, signal){
+  const { data } = await supa.auth.getSession(); const tok = data && data.session ? data.session.access_token : (session && session.access_token);
+  const r = await fetch(AI_URL, { method:"POST", signal, headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+tok, "apikey":SUPA_KEY }, body: JSON.stringify(body) });
+  let j = null; try{ j = await r.json(); }catch(e){}
+  if(!r.ok){ const e = new Error((j && j.error) || ("HTTP "+r.status)); e.code = r.status===404 ? "not_deployed" : r.status===429 ? "rate_limited" : r.status===401 ? "auth" : (j && j.code) || "error"; throw e; }
+  return j;
+}
+const textOf = c => (c||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+async function ask(prompt, signal){ const j = await claudeCall({ messages:[{role:"user", content:prompt}] }, signal); return textOf(j.content); }
+async function askJSON(prompt){ const t = await ask(prompt); const m = t.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : null; }
+async function agent(system, msgs, signal){
+  const tools = TOOLS.map(t=>({ name:t.name, description:t.description, input_schema:t.inputSchema }));
+  for(let i=0;i<8;i++){
+    const j = await claudeCall({ system, messages:msgs, tools }, signal);
+    msgs.push({ role:"assistant", content:j.content });
+    const uses = (j.content||[]).filter(b=>b.type==="tool_use");
+    if(j.stop_reason!=="tool_use" || !uses.length) return textOf(j.content) || "Listo.";
+    const results = await Promise.all(uses.map(async u=>{
+      const tool = TOOLS.find(t=>t.name===u.name);
+      try{ if(!tool) throw new Error("Herramienta desconocida"); const out = await tool.execute(u.input||{}); return { type:"tool_result", tool_use_id:u.id, content: typeof out==="string" ? out : JSON.stringify(out) }; }
+      catch(e){ return { type:"tool_result", tool_use_id:u.id, content:"Error: "+e.message, is_error:true }; }
+    }));
+    msgs.push({ role:"user", content:results });
+  }
+  return "Hice varios pasos. Revisa el calendario.";
+}
+function initAI(){
+  if(canSpeak) $("#speakBrief").hidden = false;
+  if(SR) setupDictation();
+  renderChat();
+}
+function aiErr(e){
+  if(e && e.name==="AbortError") return "Detenido.";
+  const c = e && e.code;
+  if(c==="not_deployed") return "La IA todavía no está activada: falta desplegar la función orbita-ia en Supabase (paso 4 del LEEME).";
+  if(c==="auth") return "Tu sesión venció. Cierra sesión y vuelve a entrar.";
+  if(c==="rate_limited") return "Demasiadas solicitudes seguidas. Espera un minuto e intenta de nuevo.";
+  if(c==="no_key") return "Falta guardar la clave de Anthropic en Supabase (paso 4 del LEEME).";
+  return "La IA no respondió. Intenta de nuevo en un momento.";
+}
+function eventsDigest(fromD, toD){
+  return sorted().filter(e=>{const d=evStart(e);return d>=fromD&&d<=toD;}).map(e=>({id:e.id,title:e.title,type:e.type,date:e.date,time:e.time,duration:e.duration,city:e.city,place:e.place,contact:e.contact,notes:e.notes,done:!!e.done}));
+}
+function rules(){
+  const n = new Date();
+  return `Eres Órbita, el asistente personal de agenda de este usuario. Responde siempre en español de Colombia, claro, cálido y breve.
+Fecha y hora actual: ${fmtDay(n)} ${pad(n.getHours())}:${pad(n.getMinutes())} (fecha ISO ${ymd(n)}). Semana de lunes a domingo.
+Ciudad base del usuario: ${homeCity}. Ciudades disponibles: ${Object.keys(CITIES).join(", ")}.
+Tienes herramientas para leer, crear, editar y borrar eventos del calendario, buscar huecos libres, ver la ruta de viajes del mes y preparar llamadas.
+Reglas:
+- Antes de crear un evento, consulta la agenda de ese día para detectar cruces; si hay cruce, avísalo y propone otra hora.
+- Convierte fechas relativas ("el jueves", "mañana", "en 15 días") a fechas exactas YYYY-MM-DD y horas HH:MM de 24 h.
+- Tipos válidos: cita, compromiso, viaje, llamada, personal.
+- Si la cita es en otra ciudad distinta a la base, considera el tiempo de traslado y sugiérelo.
+- Cuando te pidan "llamar a alguien para agendar", usa schedule_call: tú no puedes marcar todavía, pero dejas la llamada preparada con guion.
+- Después de usar herramientas, confirma en 1-3 frases qué hiciste con fecha y hora legibles.`;
+}
+const TOOLS = [
+  { name:"list_events", description:"Lista los eventos entre dos fechas (YYYY-MM-DD, inclusive). Devuelve un arreglo con id, título, tipo, fecha, hora, ciudad y estado.",
+    inputSchema:{type:"object",properties:{from:{type:"string"},to:{type:"string"}},required:["from","to"]},
+    execute(i){ const a=parseYmd(String(i.from)); const b=parseYmd(String(i.to)); b.setHours(23,59,59); return eventsDigest(a,b); } },
+  { name:"create_event", description:"Crea un evento en el calendario. Devuelve el id y un aviso si se cruza con otro evento.",
+    inputSchema:{type:"object",properties:{title:{type:"string"},type:{type:"string",enum:["cita","compromiso","viaje","llamada","personal"]},date:{type:"string",description:"YYYY-MM-DD"},time:{type:"string",description:"HH:MM 24h"},duration:{type:"number",description:"minutos"},city:{type:"string"},place:{type:"string"},contact:{type:"string"},notes:{type:"string"}},required:["title","date"]},
+    async execute(i){
+      const d={title:String(i.title),type:TYPE_LABEL[i.type]?String(i.type):"cita",date:String(i.date),time:i.time?String(i.time):"",duration:Number(i.duration)||60,city:CITIES[i.city]?String(i.city):"",place:String(i.place||""),contact:String(i.contact||""),notes:String(i.notes||""),done:false};
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw new Error("Fecha inválida, usa YYYY-MM-DD");
+      const clash=findClash(d); const id=await addDoc("events",d); toolNote("Agendé: "+d.title+" · "+fmtShort(parseYmd(d.date))+" "+(d.time||""));
+      return {id, clash: clash?{title:clash.title,time:clash.time}:null};
+    } },
+  { name:"update_event", description:"Modifica campos de un evento existente por id (por ejemplo cambiar fecha u hora, o marcar done=true). Devuelve ok.",
+    inputSchema:{type:"object",properties:{id:{type:"string"},title:{type:"string"},type:{type:"string"},date:{type:"string"},time:{type:"string"},duration:{type:"number"},city:{type:"string"},place:{type:"string"},contact:{type:"string"},notes:{type:"string"},done:{type:"boolean"}},required:["id"]},
+    async execute(i){ const id=String(i.id); if(!S.events.find(e=>e.id===id)) throw new Error("No existe ese id"); const p={}; ["title","type","date","time","city","place","contact","notes"].forEach(k=>{ if(i[k]!=null) p[k]=String(i[k]); }); if(i.duration!=null) p.duration=Number(i.duration); if(i.done!=null) p.done=!!i.done; await updDoc("events",id,p); toolNote("Actualicé un evento"); return "ok"; } },
+  { name:"delete_event", description:"Elimina un evento por id. Úsalo solo cuando el usuario lo pida explícitamente. Devuelve ok.",
+    inputSchema:{type:"object",properties:{id:{type:"string"}},required:["id"]},
+    async execute(i){ const e=S.events.find(x=>x.id===String(i.id)); if(!e) throw new Error("No existe ese id"); await delDoc("events",e.id); toolNote("Eliminé: "+e.title); return "ok"; } },
+  { name:"find_free_slots", description:"Busca huecos libres de cierta duración (minutos) en un día YYYY-MM-DD entre 07:00 y 20:00. Devuelve lista de horas de inicio HH:MM.",
+    inputSchema:{type:"object",properties:{date:{type:"string"},duration:{type:"number"}},required:["date"]},
+    execute(i){ return freeSlots(String(i.date), Number(i.duration)||60); } },
+  { name:"month_route", description:"Devuelve la ruta de viajes del mes (año y mes 1-12): paradas, km, modo y alertas de tiempo de traslado.",
+    inputSchema:{type:"object",properties:{year:{type:"number"},month:{type:"number"}},required:["year","month"]},
+    execute(i){ return routeLegs(Number(i.year), Number(i.month)-1).map(l=>({city:l.city,home:!!l.home,km:l.km?Math.round(l.km):0,mode:l.mode||"",hours:l.hrs?Math.round(l.hrs*10)/10:0,warn:l.warn||"",events:(l.events||[]).map(e=>e.date+" "+e.time+" "+e.title)})); } },
+  { name:"schedule_call", description:"Prepara una llamada para agendar una cita con alguien: guarda nombre, teléfono, objetivo y disponibilidad, y genera el guion. Devuelve el id de la llamada.",
+    inputSchema:{type:"object",properties:{name:{type:"string"},phone:{type:"string"},goal:{type:"string"},window:{type:"string"},city:{type:"string"}},required:["name","goal"]},
+    async execute(i){ const id=await createCall({name:String(i.name),phone:String(i.phone||""),goal:String(i.goal),window:String(i.window||""),city:CITIES[i.city]?String(i.city):""}); toolNote("Preparé la llamada a "+i.name); return {id}; } }
+];
+function freeSlots(ds, dur){
+  const evs = onDay(ds).filter(e=>e.time);
+  const out=[]; for(let m=7*60;m+dur<=20*60;m+=30){ const s=new Date(parseYmd(ds).getTime()+m*6e4), e=new Date(s.getTime()+dur*6e4); if(!evs.some(x=>evStart(x)<e && new Date(evStart(x).getTime()+(x.duration||60)*6e4)>s)) out.push(pad(Math.floor(m/60))+":"+pad(m%60)); }
+  return out;
+}
+
+/* ---------- Chat ---------- */
+let turns = [], busy=false, ctl=null, chatLog=[];
+const SUGS = ["¿Qué tengo esta semana?","Agéndame almuerzo con Laura el viernes a la 1 pm","¿Tengo tiempo de ir de Bogotá a Medellín antes de mi próxima cita?","Llama al consultorio para una cita de control la próxima semana"];
+function renderChat(){
+  const box=$("#msgs");
+  if(!chatLog.length){
+    box.innerHTML = `<div class="msg ai">Hola, soy Órbita. Dime en tus palabras qué necesitas: agendar, mover o cancelar citas, revisar tu semana, planear un viaje o preparar una llamada para que te den una cita.</div>`;
+  } else box.innerHTML = chatLog.map(m=>`<div class="msg ${m.k}">${esc(m.t)}</div>`).join("");
+  $("#sugs").innerHTML = chatLog.length ? "" : SUGS.map(s=>`<button class="sug" type="button">${esc(s)}</button>`).join("");
+  box.scrollTop = box.scrollHeight;
+}
+function toolNote(t){ chatLog.push({k:"tool",t:"⚙ "+t}); if(current==="asistente") renderChat(); }
+$("#sugs").addEventListener("click",e=>{ const b=e.target.closest(".sug"); if(b){ $("#chatIn").value=b.textContent; send(); } });
+$("#chatSend").onclick = send;
+$("#chatIn").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } });
+$("#chatStop").onclick = ()=>ctl&&ctl.abort();
+$("#chatClear").onclick = ()=>{ turns=[]; chatLog=[]; renderChat(); };
+function trimTurns(t){
+  if(t.length<=30) return t;
+  for(let i=t.length-30;i<t.length;i++){ if(t[i].role==="user" && typeof t[i].content==="string") return t.slice(i); }
+  return t.slice(-1);
+}
+async function send(){
+  const txt=$("#chatIn").value.trim(); if(!txt||busy) return;
+  if(!AI.ok){ toast("Entra con tu cuenta para usar la IA.", true); return; }
+  $("#chatIn").value=""; busy=true; $("#chatSend").hidden=true; $("#chatStop").hidden=false;
+  chatLog.push({k:"me",t:txt});
+  const bubble={k:"ai",t:"Pensando…"}; chatLog.push(bubble); renderChat();
+  ctl = new AbortController();
+  const work = trimTurns(turns).concat([{role:"user",content:txt}]);
+  try{ bubble.t = await agent(rules(), work, ctl.signal); turns = work; }
+  catch(e){ bubble.t = aiErr(e); }
+  busy=false; $("#chatSend").hidden=false; $("#chatStop").hidden=true; renderChat();
+}
+function setupDictation(){
+  const mic=$("#mic"); mic.hidden=false; let rec=null, base="";
+  mic.onclick=()=>{
+    if(rec){ rec.stop(); return; }
+    rec = new SR(); rec.lang="es-CO"; rec.interimResults=true; rec.continuous=false;
+    base = $("#chatIn").value ? $("#chatIn").value+" " : "";
+    rec.onresult = ev=>{ let t=""; for(let i=0;i<ev.results.length;i++) t+=ev.results[i][0].transcript; $("#chatIn").value = base + t; };
+    rec.onend = ()=>{ rec=null; mic.classList.remove("on"); };
+    rec.onerror = ev=>{ if(ev.error==="not-allowed") { mic.hidden=true; toast("Permite el micrófono en los ajustes del navegador para dictar."); } };
+    mic.classList.add("on"); rec.start();
+  };
+}
+
+/* ---------- Resumen de la mañana ---------- */
+let briefText = "";
+$("#genBrief").onclick = async ()=>{
+  if(!AI.ok){ toast("Entra con tu cuenta para usar la IA.", true); return; }
+  const btn=$("#genBrief"); btn.disabled=true; $("#brief").textContent="Pensando…";
+  const n=new Date(); const t0=new Date(ymd(n)+"T00:00:00"); const t2=new Date(t0.getTime()+2*864e5-1);
+  const unread = S.emails.filter(m=>!m.read).slice(0,15).map(m=>({de:m.from,asunto:m.subject,texto:String(m.body||"").slice(0,600)}));
+  const legs = routeLegs(n.getFullYear(),n.getMonth()).filter(l=>l.warn).map(l=>l.warn);
+  const prompt = `Escribe el resumen de la mañana para el usuario, en español de Colombia, tono de asistente ejecutivo cálido. Hoy es ${fmtDay(n)}.
+Formato: un saludo de una línea; "Hoy:" con cada evento en una línea (hora — título — lugar); "Mañana:" breve; "Correos:" los 3 más importantes con la acción sugerida; "Ojo:" riesgos (cruces, traslados, pendientes sin confirmar); cierra con una frase de enfoque. Sin markdown, sin asteriscos. Máximo 170 palabras.
+Eventos hoy y mañana: ${JSON.stringify(eventsDigest(t0,t2))}
+Correos sin leer: ${JSON.stringify(unread)}
+Alertas de ruta: ${JSON.stringify(legs)}`;
+  try{ const text=await ask(prompt); briefText=text; $("#brief").textContent=text; }
+  catch(e){ $("#brief").textContent = aiErr(e); }
+  btn.disabled=false;
+};
+$("#speakBrief").onclick = ()=>{
+  if(!canSpeak) return;
+  if(!briefText){ toast("Primero genera el resumen."); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(briefText.slice(0,4000)); u.lang = "es-CO"; u.rate = 1;
+  const v = speechSynthesis.getVoices().find(v=>/^es(-|_)(CO|MX|US|419)/i.test(v.lang)) || speechSynthesis.getVoices().find(v=>/^es/i.test(v.lang));
+  if(v) u.voice = v;
+  speechSynthesis.speak(u);
+};
+
+/* =========================================================
+   LLAMADAS
+   ========================================================= */
+async function createCall(c){
+  const id = await addDoc("calls",{...c,status:"prep",script:""});
+  genScript(id, c);
+  return id;
+}
+async function genScript(id, c){
+  const n=new Date(); const slots=[];
+  for(let k=1;k<=10 && slots.length<6;k++){ const d=new Date(n.getTime()+k*864e5); if(d.getDay()===0) continue; const f=freeSlots(ymd(d),60).filter(t=>t>="08:00"&&t<="17:00"); if(f.length) slots.push(fmtShort(d)+": "+[f[0],f[Math.floor(f.length/2)],f[f.length-1]].filter((v,i,a)=>a.indexOf(v)===i).join(", ")); }
+  let script = `Hola, buenos días. Llamo de parte de mi jefe/cliente para ${c.goal}.\n\nDisponibilidad:\n${slots.join("\n")}\n\nSi alguno sirve, confirmar fecha, hora, dirección y si hay que llevar algo.`;
+  if(AI.ok){
+    try{
+      const text = await ask(`Escribe un guion corto y natural (español de Colombia) para una llamada telefónica a "${c.name}" con el objetivo: "${c.goal}". Preferencias del usuario: "${c.window||"cualquier horario"}". ${c.city?"La cita es en "+c.city+".":""}
+Horarios libres reales del usuario (ofrece solo estos): \n${slots.join("\n")}
+Estructura: saludo y motivo; ofrecer 2-3 opciones concretas; cómo responder si no hay disponibilidad; qué datos confirmar al final (fecha, hora, dirección, requisitos). Sin markdown. Máximo 140 palabras.`);
+      if(text) script = text;
+    }catch(e){ /* se queda el guion base */ }
+  }
+  try{ await updDoc("calls",id,{script,status:"ready",slots}); }catch(e){}
+}
+$("#callForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const c={name:$("#cName").value.trim(),phone:$("#cPhone").value.trim(),goal:$("#cGoal").value.trim(),window:$("#cWindow").value.trim(),city:$("#cCity").value};
+  if(!c.name||!c.goal) return;
+  try{ await createCall(c); $("#callForm").reset(); $("#cCity").value=""; toast("Llamada en cola. La IA está escribiendo el guion."); }catch(_){ toast("No se pudo guardar la llamada.", true); }
+});
+let resolving = null;
+function renderCalls(){
+  const calls=[...S.calls].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  $("#callCount").textContent = calls.filter(c=>c.status==="ready"||c.status==="prep").length+" pendientes";
+  const ST={prep:["prep","Preparando guion"],ready:["ready","Lista para llamar"],ok:["ok","Cita confirmada"],fail:["fail","Sin acuerdo"]};
+  $("#calls").innerHTML = calls.length ? calls.map(c=>{
+    const st=ST[c.status]||ST.ready;
+    return `<div class="call"><div class="call-top"><div style="min-width:0"><div style="font-weight:700">${esc(c.name)} ${c.example?'<span class="example-tag">EJEMPLO</span>':""}</div><div class="muted" style="font-size:13px">${esc(c.goal)}${c.window?" · "+esc(c.window):""}</div></div><span class="st ${st[0]}">${st[1]}</span></div>
+      ${c.phone?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="mono" style="user-select:all">${esc(c.phone)}</span><button class="btn sm" data-copy="${esc(c.phone)}">Copiar número</button></div>`:""}
+      ${c.script?`<div class="script">${esc(c.script)}</div>`:""}
+      ${(c.status==="ready")?(resolving===c.id?`<form class="fx" data-resolve="${esc(c.id)}"><div class="row"><label class="f">Fecha acordada<input class="i" type="date" name="d" required></label><label class="f">Hora<input class="i" type="time" name="t" required></label></div><label class="f">Lugar<input class="i" name="p" placeholder="Dirección"></label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary sm" type="submit">Crear cita en el calendario</button><button class="btn sm ghost" type="button" data-cancelres="1">Cancelar</button></div></form>`
+        :`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary sm" data-res="${esc(c.id)}">Registrar cita confirmada</button><button class="btn sm" data-fail="${esc(c.id)}">No hubo acuerdo</button></div>`):""}
+      ${(c.status==="ok"||c.status==="fail")?`<div><button class="btn sm ghost" data-rmcall="${esc(c.id)}">Quitar de la lista</button></div>`:""}
+    </div>`;}).join("") : `<div class="empty">Sin llamadas en cola. Llena el formulario o dile al asistente “llama a… para agendar…”.</div>`;
+}
+$("#calls").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.copy){ navigator.clipboard.writeText(b.dataset.copy).then(()=>toast("Número copiado.")).catch(()=>toast("Selecciona el número para copiarlo.")); }
+  if(b.dataset.res){ resolving=b.dataset.res; renderCalls(); }
+  if(b.dataset.cancelres){ resolving=null; renderCalls(); }
+  if(b.dataset.fail) updDoc("calls",b.dataset.fail,{status:"fail"});
+  if(b.dataset.rmcall) delDoc("calls",b.dataset.rmcall);
+});
+$("#calls").addEventListener("submit", async e=>{
+  const f=e.target.closest("form[data-resolve]"); if(!f) return; e.preventDefault();
+  const c=S.calls.find(x=>x.id===f.dataset.resolve); if(!c) return;
+  const ev={title:c.goal.replace(/^agendar\s*/i,"").replace(/^./,m=>m.toUpperCase())+" · "+c.name,type:"cita",date:f.d.value,time:f.t.value,duration:60,city:c.city||"",place:f.p.value.trim(),contact:c.name+(c.phone?" "+c.phone:""),notes:"Agendada por llamada",done:false};
+  await addDoc("events",ev); await updDoc("calls",c.id,{status:"ok",result:ev.date+" "+ev.time});
+  resolving=null; toast("Cita creada: "+fmtShort(parseYmd(ev.date))+" "+ev.time);
+});
+
+/* =========================================================
+   CORREO
+   ========================================================= */
+function renderMail(){
+  const ms=[...S.emails].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  $("#mailCount").textContent = ms.filter(m=>!m.read).length+" sin leer";
+  $("#mails").innerHTML = ms.length ? ms.map(m=>`<div class="mail ${m.read?"":"unread"}"><div style="min-width:0"><div class="from">${esc(m.from)} ${m.example?'<span class="example-tag">EJEMPLO</span>':""}</div><div class="subj">${esc(m.subject)}</div></div>
+    <div style="display:flex;gap:4px"><button class="icon-btn" data-read="${esc(m.id)}" aria-label="${m.read?"Marcar sin leer":"Marcar leído"}" title="${m.read?"Marcar sin leer":"Marcar leído"}"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></button><button class="icon-btn" data-rmmail="${esc(m.id)}" aria-label="Eliminar"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button></div>
+    <div class="prev">${esc(m.body)}</div></div>`).join("") : `<div class="empty">La bandeja está vacía. Pega un correo a la izquierda.</div>`;
+}
+$("#mails").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.read){ const m=S.emails.find(x=>x.id===b.dataset.read); if(m) updDoc("emails",m.id,{read:!m.read}); }
+  if(b.dataset.rmmail) delDoc("emails",b.dataset.rmmail);
+});
+$("#mailForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  await addDoc("emails",{from:$("#mFrom").value.trim(),subject:$("#mSubj").value.trim(),body:$("#mBody").value.trim(),read:false});
+  $("#mailForm").reset(); toast("Correo guardado.");
+});
+let found=[];
+$("#mailScan").onclick = async ()=>{
+  if(!AI.ok){ toast("Entra con tu cuenta para usar la IA.", true); return; }
+  const unread=S.emails.filter(m=>!m.read).slice(0,20); if(!unread.length){ toast("No hay correos sin leer."); return; }
+  const btn=$("#mailScan"); btn.disabled=true; $("#found").innerHTML='<div class="muted">Leyendo correos…</div>';
+  try{
+    const r = await askJSON(`Hoy es ${ymd(new Date())} (${fmtDay(new Date())}). Lee estos correos y extrae cada cita, reunión, vencimiento o compromiso con fecha. Devuelve SOLO JSON: {"items":[{"title":string,"type":"cita"|"compromiso"|"viaje"|"llamada"|"personal","date":"YYYY-MM-DD","time":"HH:MM" o "","city":nombre de ciudad colombiana o "","source":remitente}]}. Si no hay ninguno, items vacío.
+Correos: ${JSON.stringify(unread.map(m=>({de:m.from,asunto:m.subject,texto:String(m.body||"").slice(0,1200)})))}`);
+    found = (r&&Array.isArray(r.items)) ? r.items.filter(x=>x&&x.title&&/^\d{4}-\d{2}-\d{2}$/.test(String(x.date))) : [];
+  }catch(e){ found=[]; $("#found").innerHTML=`<div class="muted">${esc(aiErr(e))}</div>`; btn.disabled=false; return; }
+  btn.disabled=false; renderFound();
+};
+function renderFound(){
+  $("#found").innerHTML = found.length ? `<h3>Compromisos encontrados</h3>`+found.map((x,i)=>`<div class="found"><div style="min-width:0"><div style="font-weight:700">${esc(x.title)}</div><div class="muted" style="font-size:12.5px">${fmtShort(parseYmd(x.date))} ${x.time?"· "+fmtTime(x.time):""} ${x.city?"· "+esc(x.city):""} · de ${esc(x.source||"")}</div></div>${x.added?'<span class="st ok">Agregado</span>':`<button class="btn sm primary" data-addfound="${i}">Agregar</button>`}</div>`).join("") : `<div class="muted">No encontré fechas en los correos sin leer.</div>`;
+}
+$("#found").addEventListener("click", async e=>{
+  const b=e.target.closest("[data-addfound]"); if(!b) return;
+  const x=found[Number(b.dataset.addfound)];
+  await addDoc("events",{title:String(x.title),type:TYPE_LABEL[x.type]?x.type:"compromiso",date:x.date,time:x.time||"",duration:60,city:CITIES[x.city]?x.city:"",place:"",contact:String(x.source||""),notes:"Detectado en correo",done:false});
+  x.added=true; renderFound(); toast("Agregado al calendario.");
+});
+
+/* =========================================================
+   Recordatorios en vivo
+   ========================================================= */
+const warned = new Set();
+function tick(){
+  const now=new Date();
+  S.events.forEach(e=>{
+    if(e.done||!e.time) return;
+    const m=(evStart(e)-now)/6e4;
+    [60,15].forEach(th=>{ const k=e.id+":"+th; if(m>0 && m<=th && !warned.has(k)){ warned.add(k); toast(`En ${Math.round(m)} min: ${e.title}${e.place?" · "+e.place:""}`, th===15); } });
+  });
+  if(current==="panel") renderPanel();
+}
+setInterval(tick, 30000);
+
+/* =========================================================
+   Render global
+   ========================================================= */
+function renderAll(){
+  setSync();
+  if(current==="panel") renderPanel();
+  if(current==="calendario") renderCal();
+  if(current==="mapa") renderMap();
+  if(current==="llamadas") renderCalls();
+  if(current==="correo") renderMail();
+  if(current==="asistente") renderChat();
+}
+cityOpts($("#fCity"),true); cityOpts($("#cCity"),true); cityOpts($("#homeCity"),false);
+$("#homeCity").value = CITIES[homeCity]?homeCity:"Bogotá";
+$("#fDate").value = selDay;
+route();
+initStore().then(()=>setTimeout(tick,1500));
+initAI();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
