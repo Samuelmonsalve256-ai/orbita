@@ -1,13 +1,13 @@
 {
-  "name": "Órbita · Panel de vida",
-  "short_name": "Órbita",
-  "description": "Agenda, alertas, rutas por Colombia y asistente con IA.",
+  "name": "CRONOVA · Agenda inteligente",
+  "short_name": "CRONOVA",
+  "description": "Agenda, rutas por Colombia y asistente con IA.",
   "lang": "es-CO",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#060A13",
-  "theme_color": "#060A13",
+  "background_color": "#06071A",
+  "theme_color": "#06071A",
   "icons": [
     { "src": "icono-180.png", "sizes": "180x180", "type": "image/png" },
     { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
