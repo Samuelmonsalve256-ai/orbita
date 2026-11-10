@@ -25,6 +25,8 @@ Tu centro de mando personal: agenda, alertas, resumen de la mañana, asistente c
 | `sw.js` | Guarda la app para que abra rápido y sin internet (no guarda tus datos) |
 | `supabase/01_orbita.sql` | Crea las tablas, las reglas de seguridad y el historial |
 | `supabase/02_cronova.sql` | Permite guardar tus Ajustes en la nube (nombre, casa, colores) |
+| `supabase/03_cronova_avisos.sql` | Notificaciones al celular: tablas y revisión automática cada 5 minutos |
+| `supabase/functions/cronova-avisos/index.ts` | Envía las notificaciones (resumen del día y aviso antes de cada cita) |
 | `supabase/functions/orbita-ia/index.ts` | Conecta la app con la IA de Claude. Tu clave de Anthropic vive solo ahí |
 | `.claude/skills/design-motion-principles/` | Skill de diseño de animaciones para Claude Code |
 
@@ -74,6 +76,30 @@ Mientras no hagas este paso, todo lo demás funciona; solo los botones de IA mue
 **Mac (Chrome):** abre la dirección → ícono de instalar en la barra de direcciones → **Instalar**.
 
 ---
+
+## PASO 6: Notificaciones al celular (como en Mis Deudores)
+
+Te llegan aunque CRONOVA esté cerrada:
+- **Resumen del día** con todas tus citas, a las **10:00 a. m.** (puedes cambiar la hora).
+- **Aviso 30 minutos antes** de cada cita (puedes elegir 15, 30, 45, 60 o 90 minutos).
+
+**6.1 · Crear la función `cronova-avisos`**
+1. En Supabase: **Edge Functions → Deploy a new function → Via Editor**.
+2. Nombre exacto: `cronova-avisos`.
+3. Borra el código de ejemplo, pega todo el contenido de `supabase/functions/cronova-avisos/index.ts` y pulsa **Deploy**.
+
+**6.2 · Programar la revisión automática**
+1. **SQL Editor → New query**, pega todo el contenido de `supabase/03_cronova_avisos.sql` y pulsa **Run**.
+2. Al final debe aparecer la tarea `cronova-avisos` con `*/5 * * * *` y `active = true`.
+3. Si sale un error con `pg_cron` o `pg_net`, actívalos en **Database → Extensions** y vuelve a ejecutar el archivo.
+
+**6.3 · Activarlas en cada dispositivo**
+1. En el iPhone, abre CRONOVA **desde el ícono de la pantalla de inicio** (no desde Safari).
+2. Ve a **Ajustes → Notificaciones** y toca **Activar notificaciones**. Acepta el permiso.
+3. Te llega una notificación de prueba. Si llega, ya quedó.
+4. Haz lo mismo en el Mac si también quieres los avisos allí.
+
+> Si cambias el archivo `index.ts` de la función, vuelve a abrir **Edge Functions → cronova-avisos → Code**, pega el código nuevo y pulsa **Deploy**.
 
 ## Reglas de la agenda
 

@@ -53,10 +53,11 @@ const COLORS = { indigo: ["#4f46e5", "#7c3aed", "Índigo"], azul: ["#2563eb", "#
   naranja: ["#ea580c", "#f59e0b", "Naranja"], rosa: ["#db2777", "#f43f5e", "Rosa"], violeta: ["#7c3aed", "#c026d3", "Violeta"], grafito: ["#334155", "#64748b", "Grafito"] };
 const DOR = { n: "Doradal", d: "05", lat: 5.899, lon: -74.716, sub: "Puerto Triunfo" };
 const DEF_PREFS = { nombre: "Samuel Rich", home: { name: "Bogotá D.C.", dept: "11", lat: 4.711, lon: -74.072 }, color: "indigo", fuente: "jakarta", lugares: [DOR],
-  texto: "normal", sonido: true, volumen: 0.6, anim: "completas", aviso60: true, aviso15: true, avisoSistema: false, horaResumen: "06:30" };
+  texto: "normal", sonido: true, volumen: 0.6, anim: "completas", aviso60: true, aviso15: true, avisoSistema: false, horaResumen: "10:00", pushDiario: true, pushAntes: true, avisoAntes: 30 };
 let PREFS = Object.assign({}, DEF_PREFS, lsGet("cronova.prefs", {}));
 if (!PREFS.v21) { delete PREFS.tema; if (PREFS.fuente === "moderna" || PREFS.fuente === "clasica") PREFS.fuente = "jakarta"; PREFS.color = PREFS.color || "indigo";
   if (!(PREFS.lugares || []).some(p => p.n === "Doradal")) PREFS.lugares = [DOR].concat(PREFS.lugares || []); PREFS.v21 = true; lsSet("cronova.prefs", PREFS); }
+if (!PREFS.v22) { if (!PREFS.horaResumen || PREFS.horaResumen === "06:30") PREFS.horaResumen = "10:00"; PREFS.v22 = true; lsSet("cronova.prefs", PREFS); }
 function applyPrefs() {
   const h = document.documentElement;
   const c = COLORS[PREFS.color] || COLORS.indigo; h.style.setProperty("--acc", c[0]); h.style.setProperty("--acc-2", c[1]);
@@ -1115,6 +1116,54 @@ $("#found").addEventListener("click", async e => {
   x.added = true; renderFound(); toast("Agregado al calendario.", "ok", "guardar");
 });
 
+/* ───────────────────────── Notificaciones al celular (Web Push) ─────────────────────────
+   Igual que en Mis Deudores: la función "cronova-avisos" de Supabase revisa cada 5 minutos
+   y envía el resumen del día y el aviso antes de cada cita, aunque la app esté cerrada. */
+const PUSH_FN = SUPA_URL + "/functions/v1/cronova-avisos";
+const pushSoportado = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let pushEstado = "?";
+async function pushCall(accion) {
+  const { data } = await supa.auth.getSession(); const tok = data && data.session ? data.session.access_token : "";
+  const r = await fetch(PUSH_FN, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok, apikey: SUPA_KEY }, body: JSON.stringify({ accion }) });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) { const e = new Error(j.error || "HTTP " + r.status); e.status = r.status; throw e; }
+  return j;
+}
+function b64ToBytes(b64) { const s = (b64 + "=".repeat((4 - b64.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/"); const bin = atob(s); return Uint8Array.from(bin, c => c.charCodeAt(0)); }
+async function pushSub() { if (!pushSoportado()) return null; const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
+function pushError(e) {
+  if (e && e.status === 404) return "Falta crear la función cronova-avisos en Supabase (paso 6 del LEEME).";
+  if (e && /03_cronova_avisos|orb_push/.test(e.message || "")) return "Falta ejecutar supabase/03_cronova_avisos.sql en Supabase.";
+  if (e instanceof TypeError) return "No pude conectar con el servicio de avisos. Revisa que la función cronova-avisos esté creada.";
+  return "No se pudieron activar los avisos: " + ((e && e.message) || "error desconocido");
+}
+async function activarPush() {
+  if (!pushSoportado()) { toast(esIOS() && !instalada() ? "En el iPhone primero agrega CRONOVA a la pantalla de inicio y ábrela desde el ícono." : "Este navegador no permite notificaciones.", "warn", "error"); return; }
+  if (!session) { toast("Entra con tu cuenta para activar los avisos.", "warn", "error"); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { toast("No diste permiso de notificaciones. Actívalo en los ajustes del celular para CRONOVA.", "warn", "error"); return; }
+  try {
+    const r = await pushCall("clave");
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(r.publica) });
+    const j = sub.toJSON();
+    const { error } = await supa.from("orb_push_suscripciones").upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, dispositivo: esIOS() ? "iPhone" : (navigator.platform || "Computador") }, { onConflict: "endpoint" });
+    if (error) throw new Error(error.message);
+    await pushPrefs();
+    pushEstado = "on"; toast("Notificaciones activadas en este dispositivo.", "ok", "completar");
+    pushCall("prueba").catch(() => {});
+  } catch (e) { console.warn(e); pushEstado = "off"; toast(pushError(e), "bad", "error"); }
+  if (current === "ajustes") renderSettings();
+}
+async function desactivarPush() {
+  try { const sub = await pushSub(); if (sub) { await supa.from("orb_push_suscripciones").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); } } catch (e) { console.warn(e); }
+  pushEstado = "off"; toast("Notificaciones desactivadas en este dispositivo.", "", "borrar"); if (current === "ajustes") renderSettings();
+}
+async function revisarPush() { try { const sub = await pushSub(); pushEstado = sub && Notification.permission === "granted" ? "on" : "off"; } catch (e) { pushEstado = "off"; } if (current === "ajustes") renderSettings(); }
+
 /* ───────────────────────── AJUSTES ───────────────────────── */
 const FONTS = [["jakarta", "Jakarta", "La misma de Traspasos", "'Plus Jakarta Sans'"], ["moderna", "Moderna", "Sora + Inter", "'Sora'"], ["tecnica", "Técnica", "Space Grotesk + IBM Plex", "'Space Grotesk'"]];
 function swatchesHTML(big) { return `<div class="swatches ${big ? "big" : ""}">${Object.entries(COLORS).map(([k, c]) => `<button type="button" class="swatch" data-color="${k}" aria-pressed="${PREFS.color === k}" style="--a:${c[0]};--b:${c[1]}"><i>${PREFS.color === k ? ico("check") : ""}</i>${c[2]}</button>`).join("")}</div>`; }
@@ -1143,10 +1192,12 @@ function renderSettings() {
     <div class="set-row"><div class="l"><b>Volumen</b></div><div class="r" style="min-width:230px"><input type="range" id="pVol" min="0" max="1" step="0.05" value="${PREFS.volumen}"><button class="btn sm" id="pTest">${ico("sonido")}Probar</button></div></div>
     <div class="set-row"><div class="l"><b>Animaciones</b><span>Reducidas: todo aparece al instante.</span></div><div class="r"><div class="seg"><button type="button" data-anim="completas" aria-pressed="${PREFS.anim === "completas"}">Completas</button><button type="button" data-anim="reducidas" aria-pressed="${PREFS.anim === "reducidas"}">Reducidas</button></div></div></div>
   </div>
-  <div class="card set-sec" id="s-avisos"><div class="card-h"><div class="sec-t">Recordatorios</div></div>
-    <div class="set-row"><div class="l"><b>Aviso 1 hora antes</b></div><div class="r">${sw("pA60", PREFS.aviso60)}</div></div>
-    <div class="set-row"><div class="l"><b>Aviso 15 minutos antes</b></div><div class="r">${sw("pA15", PREFS.aviso15)}</div></div>
-    <div class="set-row"><div class="l"><b>Avisos del sistema</b><span>Notificación del Mac o del iPhone mientras CRONOVA está abierta.</span></div><div class="r">${sw("pSys", PREFS.avisoSistema)}</div></div>
+  <div class="card set-sec" id="s-avisos"><div class="card-h"><div class="sec-t">Notificaciones y recordatorios</div><span class="badge" style="--c:${pushEstado === "on" ? "var(--ok)" : "var(--text3)"}"><i></i>${pushEstado === "on" ? "Activas en este dispositivo" : "Desactivadas aquí"}</span></div>
+    <div class="set-row"><div class="l"><b>Notificaciones en el celular</b><span>Te llegan aunque CRONOVA esté cerrada. Actívalas en cada dispositivo (iPhone y Mac).${esIOS() && !instalada() ? "<br><b style='color:var(--warn)'>En el iPhone primero agrega CRONOVA a la pantalla de inicio y ábrela desde el ícono.</b>" : ""}</span></div>
+      <div class="r">${pushEstado === "on" ? `<button class="btn sm" id="pPushTest">${ico("campana")}Enviar prueba</button><button class="btn sm ghost" id="pPushOff">Desactivar</button>` : `<button class="btn sm primary" id="pPushOn">${ico("campana")}Activar notificaciones</button>`}</div></div>
+    <div class="set-row"><div class="l"><b>Resumen de tus citas del día</b><span>Todas tus citas de hoy en una sola notificación.</span></div><div class="r"><input class="in" type="time" id="pBrief" value="${esc(PREFS.horaResumen)}" style="width:130px">${sw("pPushDia", PREFS.pushDiario)}</div></div>
+    <div class="set-row"><div class="l"><b>Aviso antes de cada cita</b><span>Con la cita a la que tienes que ir.</span></div><div class="r"><select class="in" id="pAntes" style="width:150px">${[15, 30, 45, 60, 90].map(m => `<option value="${m}" ${Number(PREFS.avisoAntes) === m ? "selected" : ""}>${fmtDur(m)} antes</option>`).join("")}</select>${sw("pPushAntes", PREFS.pushAntes)}</div></div>
+    <div class="set-row"><div class="l"><b>Avisos dentro de la app</b><span>Mensaje y sonido 1 hora y 15 minutos antes, mientras CRONOVA está abierta.</span></div><div class="r">${sw("pA60", PREFS.aviso60)}${sw("pA15", PREFS.aviso15)}</div></div>
   </div>
   <div class="card set-sec" id="s-nube"><div class="card-h"><div class="sec-t">Nube</div><span class="badge" style="--c:${S.mode === "db" ? "var(--ok)" : "var(--warn)"}"><i></i>${S.mode === "db" ? "Conectada" : "Sin conexión"}</span></div>
     <dl class="kv"><dt>Cuenta</dt><dd>${esc(em || "—")}</dd><dt>Eventos</dt><dd>${S.events.length}</dd><dt>Correos</dt><dd>${S.emails.length}</dd><dt>Llamadas</dt><dd>${S.calls.length}</dd><dt>Por subir</dt><dd>${Object.keys(queue).length}</dd>
@@ -1156,7 +1207,6 @@ function renderSettings() {
   <div class="card set-sec" id="s-correo"><div class="card-h"><div class="sec-t">Correo</div></div>
     <div class="set-row"><div class="l"><b>Bandeja</b><span>Pegas los correos en Correo y la IA encuentra fechas y compromisos.</span></div><div class="r"><a class="btn sm" href="#correo">${ico("correo")}Abrir correo</a></div></div>
     <div class="set-row"><div class="l"><b>Conectar Gmail</b><span>Próximo paso: leer tu bandeja sola y mandarte el resumen cada mañana.</span></div><div class="r"><span class="badge"><i></i>Próximamente</span></div></div>
-    <div class="set-row"><div class="l"><b>Hora del resumen de la mañana</b></div><div class="r"><input class="in" type="time" id="pBrief" value="${esc(PREFS.horaResumen)}" style="width:140px"></div></div>
   </div>
   <div class="card set-sec" id="s-ia"><div class="card-h"><div class="sec-t">Inteligencia artificial</div><span class="badge" id="aiChip"><i></i>Sin probar</span></div>
     <div class="set-row"><div class="l"><b>Estado de la IA</b><span>Usa la función orbita-ia de tu Supabase con tu clave de Anthropic.</span></div><div class="r"><button class="btn sm" id="pAiTest">${ico("ia")}Probar conexión</button></div></div>
@@ -1182,12 +1232,13 @@ function renderSettings() {
   $("#pTest").onclick = () => ["guardar", "completar", "alerta"].forEach((s, i) => setTimeout(() => Sfx.play(s), i * 700));
   $("#pA60").onchange = e => savePrefs({ aviso60: e.target.checked }, true);
   $("#pA15").onchange = e => savePrefs({ aviso15: e.target.checked }, true);
-  $("#pSys").onchange = async e => {
-    if (e.target.checked && "Notification" in window) { const p = await Notification.requestPermission(); if (p !== "granted") { e.target.checked = false; toast("No diste permiso de notificaciones.", "warn"); return; } }
-    else if (e.target.checked) { e.target.checked = false; toast("Este navegador no permite notificaciones.", "warn"); return; }
-    savePrefs({ avisoSistema: e.target.checked }, true);
-  };
-  $("#pBrief").onchange = e => savePrefs({ horaResumen: e.target.value }, true);
+  if ($("#pPushOn")) $("#pPushOn").onclick = activarPush;
+  if ($("#pPushOff")) $("#pPushOff").onclick = desactivarPush;
+  if ($("#pPushTest")) $("#pPushTest").onclick = async () => { try { const r = await pushCall("prueba"); toast(r.enviadas ? "Notificación de prueba enviada." : "No hay dispositivos con avisos activos.", r.enviadas ? "ok" : "warn", "toque"); } catch (e) { toast(pushError(e), "bad", "error"); } };
+  $("#pBrief").onchange = e => { savePrefs({ horaResumen: e.target.value || "10:00" }, true); toast("El resumen llegará a las " + fmtTime(e.target.value || "10:00") + ".", "ok", "toque"); };
+  $("#pPushDia").onchange = e => savePrefs({ pushDiario: e.target.checked }, true);
+  $("#pAntes").onchange = e => { savePrefs({ avisoAntes: +e.target.value }, true); toast("Te avisaré " + fmtDur(+e.target.value) + " antes de cada cita.", "ok", "toque"); };
+  $("#pPushAntes").onchange = e => savePrefs({ pushAntes: e.target.checked }, true);
   $("#pSync").onclick = syncNow;
   $("#pExport").onclick = () => { const blob = new Blob([JSON.stringify({ exportado: new Date().toISOString(), eventos: S.events, correos: S.emails, llamadas: S.calls, ajustes: PREFS }, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "cronova-respaldo-" + TODAY() + ".json"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast("Respaldo descargado.", "ok", "guardar"); };
@@ -1236,6 +1287,6 @@ setupDictation();
 loadGeo().then(() => { route(); renderAll(); });
 route();
 initStore().then(() => setTimeout(tickReminders, 1500));
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(() => revisarPush()).catch(() => {});
 window.matchMedia("(prefers-color-scheme: dark)");
 })();
