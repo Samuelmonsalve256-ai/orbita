@@ -436,8 +436,12 @@ function renderInicio() {
   const readyCalls = S.calls.filter(c => c.status === "ready").length;
   if (readyCalls) bn.push(["blue", "llamada", readyCalls === 1 ? "Tienes 1 llamada lista para hacer" : `Tienes ${readyCalls} llamadas listas para hacer`, null, "#llamadas"]);
   $("#banners").innerHTML = bn.map(b => `<div class="banner ${b[0]}">${ico(b[1])}<div class="x">${esc(b[2])}</div>${b[3] ? `<button class="btn sm" data-done="${esc(b[3])}">Sí, asistí</button>` : ""}${b[4] ? `<a class="btn sm" href="${b[4]}">Ver</a>` : ""}</div>`).join("");
+  // Tu semana
+  const t = TODAY();
+  $("#weekStrip").innerHTML = Array.from({ length: 7 }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i); const ds = ymd(d); const ev = onDay(ds);
+    return `<button type="button" class="ws ${i === 0 ? "today" : ""}" data-goday="${ds}" aria-label="${esc(fmtDay(d))}: ${ev.length} eventos"><span class="wd">${i === 0 ? "Hoy" : DOWS[(d.getDay() + 6) % 7]}</span><span class="wn">${d.getDate()}</span><span class="dots">${ev.slice(0, 4).map(e => `<i style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})"></i>`).join("")}</span><span class="cnt">${ev.length ? ev.length + (ev.length === 1 ? " evento" : " eventos") : "libre"}</span></button>`; }).join("");
   // Indicadores
-  const t = TODAY(); const wEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+  const wEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
   const nHoy = onDay(t).filter(e => !e.done).length, nSem = all.filter(e => e.date >= t && evStart(e) < wEnd).length;
   const K = [["k-azul", "agenda", nHoy, "Hoy", nHoy ? "por cumplir" : "día libre", "#agenda"], ["k-morado", "reloj", nSem, "Próximos 7 días", "compromisos", "#agenda"],
     ["k-naranja", "campana", up.length, "Pendientes", "de hoy en adelante", "#agenda"], ["k-verde", "llamada", readyCalls, "Llamadas", "por hacer", "#llamadas"]];
@@ -487,7 +491,7 @@ function updateCountdown() {
 function tlItem(e, withDate) {
   const L = evLoc(e); const c = `var(--t-${TYPES[e.type] ? e.type : "cita"})`;
   return `<div class="tl-item ${e.done ? "done" : ""}" style="--c:${c}"><div class="tl-time">${e.time || "—"}${withDate ? `<small>${esc(fmtShort(evStart(e)))}</small>` : ""}</div>
-    <div class="tl-body"><div class="t">${esc(e.title)} ${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div><div class="s">${esc(TYPES[e.type] || "")}${L ? " · " + esc(L.name) : ""}${e.place ? " · " + esc(e.place) : ""}</div></div>
+    <div class="tl-body" data-open="${esc(e.id)}" style="cursor:pointer"><div class="t">${esc(e.title)} ${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div><div class="s">${esc(TYPES[e.type] || "")}${L ? " · " + esc(L.name) : ""}${e.place ? " · " + esc(e.place) : ""}</div></div>
     <button class="icon-btn" data-toggle="${esc(e.id)}" aria-label="${e.done ? "Marcar pendiente" : "Marcar cumplida"}" title="${e.done ? "Marcar pendiente" : "Marcar cumplida"}">${ico("check")}</button></div>`;
 }
 
@@ -499,7 +503,7 @@ document.addEventListener("click", ev => {
   else if (t.dataset.done) { updDoc("events", t.dataset.done, { done: true }); toast("Marcada como cumplida.", "ok", "completar"); }
   else if (t.dataset.edit) { const e = S.events.find(x => x.id === t.dataset.edit); if (e) openEventSheet(e); }
   else if (t.dataset.del) confirmDelete(t.dataset.del);
-  else if (t.dataset.day) { const ds = t.dataset.day; selDay = ds; renderAgenda(); Sfx.play("toque"); if (matchMedia("(max-width:1180px)").matches) $(".side-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" }); }
+  else if (t.dataset.day) { const ds = t.dataset.day; selDay = ds; renderAgenda(); Sfx.play("toque"); if (matchMedia("(max-width:1180px)").matches) $("#dayPanel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" }); }
   else if (t.dataset.goday) { selDay = t.dataset.goday; calM = monthStart(parseYmd(selDay)); agView = "mes"; location.hash = "#agenda"; }
   else if (t.hasAttribute("data-new")) openEventSheet(null, t.dataset.newdate ? { date: t.dataset.newdate } : null);
   else if (t.dataset.mapto) { const e = S.events.find(x => x.id === t.dataset.mapto); if (e) { mapM = monthStart(parseYmd(e.date)); pendingFly = evLoc(e); location.hash = "#mapa"; } }
@@ -515,56 +519,140 @@ function confirmDelete(id) {
 }
 
 /* ───────────────────────── AGENDA ───────────────────────── */
-let calM = minMonth(), selDay = TODAY(), agView = "mes";
+const TICO = { cita: "cita", compromiso: "maletin", viaje: "avion", llamada: "llamada", personal: "corazon" };
+const tColor = t => `var(--t-${TYPES[t] ? t : "cita"})`;
+const tIco = t => `<span class="t-ico" style="--c:${tColor(t)}">${ico(TICO[t] || "cita")}</span>`;
+let calM = minMonth(), selDay = TODAY(), agView = "mes", feedType = "todos", feedQ = "";
+function relLong(ds) { const r = relDay(ds); if (r) return r; const dl = Math.round((parseYmd(ds) - parseYmd(TODAY())) / 864e5); return dl > 0 ? "En " + dl + " días" : "Hace " + (-dl) + " días"; }
 function renderAgenda() {
   if (calM < minMonth()) calM = minMonth(); if (calM > maxMonth()) calM = maxMonth();
   $("#agSub").textContent = "Desde hoy hasta el 31 de diciembre de " + (NOW().getFullYear() + 1) + ".";
-  $("#calMonth").textContent = cap1(MONTHS[calM.getMonth()]) + " " + calM.getFullYear();
-  $("#calPrev").disabled = calM <= minMonth(); $("#calNext").disabled = calM >= maxMonth();
   $("#vwMes").setAttribute("aria-pressed", agView === "mes"); $("#vwLista").setAttribute("aria-pressed", agView === "lista");
-  $("#calWrap").hidden = agView !== "mes"; $("#listWrap").hidden = agView !== "lista";
-  if (agView === "lista") return renderUpList();
+  $("#calWrap").hidden = agView !== "mes"; $("#monthHero").hidden = agView !== "mes"; $("#listWrap").hidden = agView !== "lista";
+  if (agView === "lista") return renderFeed();
+  // Encabezado del mes con resumen
+  const y = calM.getFullYear(), m = calM.getMonth(), t = TODAY();
+  const mEv = sorted().filter(e => { const d = parseYmd(e.date); return d.getFullYear() === y && d.getMonth() === m; });
+  const dim = new Date(y, m + 1, 0).getDate();
+  const firstDay = (y === NOW().getFullYear() && m === NOW().getMonth()) ? NOW().getDate() : 1;
+  let free = 0; for (let d = firstDay; d <= dim; d++) { const ds = y + "-" + pad(m + 1) + "-" + pad(d); if (!mEv.some(e => e.date === ds)) free++; }
+  const away = new Set(mEv.filter(e => { const l = evLoc(e); return l && !sameLoc(l, homeLoc()); }).map(e => e.date)).size;
+  const counts = Object.keys(TYPES).map(k => [k, mEv.filter(e => (TYPES[e.type] ? e.type : "cita") === k).length]);
+  $("#monthHero").innerHTML = `<div class="mh-nav"><button class="icon-btn" id="calPrev" aria-label="Mes anterior" ${calM <= minMonth() ? "disabled" : ""}>${ico("izq")}</button>
+      <div class="mh-name"><b>${MONTHS[m]}</b><span>${y}</span></div><button class="icon-btn" id="calNext" aria-label="Mes siguiente" ${calM >= maxMonth() ? "disabled" : ""}>${ico("der")}</button></div>
+    <div class="mh-stats"><div class="mh-chips"><span class="mh-chip"><b>${mEv.length}</b>${mEv.length === 1 ? "compromiso" : "compromisos"}</span><span class="mh-chip"><b>${mEv.filter(e => e.done).length}</b>cumplidos</span><span class="mh-chip"><b>${away}</b>${away === 1 ? "día fuera de casa" : "días fuera de casa"}</span><span class="mh-chip"><b>${free}</b>días libres</span></div>
+      ${mEv.length ? `<div class="mix" title="${counts.filter(c => c[1]).map(c => TYPES[c[0]] + ": " + c[1]).join(" · ")}">${counts.filter(c => c[1]).map(c => `<i style="--c:${tColor(c[0])};flex-grow:${c[1]}"></i>`).join("")}</div>` : `<div class="dim" style="font-size:.84rem">Mes despejado: aprovecha para agendar.</div>`}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="calToday">Hoy</button><button class="btn sm primary" data-new ${isPastDay(selDay) ? "" : `data-newdate="${selDay}"`}>${ico("plus")}Agendar</button></div>`;
+  $("#calPrev").onclick = () => { calM = new Date(y, m - 1, 1); renderAgenda(); };
+  $("#calNext").onclick = () => { calM = new Date(y, m + 1, 1); renderAgenda(); };
+  $("#calToday").onclick = () => { calM = minMonth(); selDay = TODAY(); renderAgenda(); };
+  // Cuadrícula
   const first = new Date(calM), offset = (first.getDay() + 6) % 7, start = new Date(first); start.setDate(1 - offset);
-  const today = TODAY();
-  let html = DOWS.map(d => `<div class="dow">${d}</div>`).join("");
+  const maxDay = Math.max(1, ...Array.from({ length: dim }, (_, i) => onDay(y + "-" + pad(m + 1) + "-" + pad(i + 1)).length));
+  let html = DOWS.map((d, i) => `<div class="dow ${i > 4 ? "we" : ""}">${d}</div>`).join("");
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
-    if (i >= 35 && d.getMonth() !== calM.getMonth()) break;
-    const ds = ymd(d), out = d.getMonth() !== calM.getMonth(), evs = onDay(ds), past = isPastDay(ds);
-    html += `<button type="button" class="day ${out ? "out" : ""} ${ds === today ? "today" : ""} ${ds === selDay ? "sel" : ""} ${past ? "past" : ""}" ${out ? 'tabindex="-1" aria-hidden="true"' : `data-day="${ds}"`} aria-label="${esc(fmtDay(d))}${past ? " (ya pasó)" : ""}, ${evs.length} eventos">
-      <span class="n"><b>${d.getDate()}</b></span>
-      ${evs.slice(0, 3).map(e => `<span class="ev" style="--c:var(--t-${TYPES[e.type] ? e.type : "cita"})">${esc((e.time ? e.time + " " : "") + e.title)}</span>`).join("")}
-      ${evs.length > 3 ? `<span class="more">+${evs.length - 3} más</span>` : ""}</button>`;
+    if (i >= 35 && d.getMonth() !== m) break;
+    const ds = ymd(d), out = d.getMonth() !== m, evs = onDay(ds), past = isPastDay(ds), we = i % 7 > 4;
+    html += `<div class="day ${out ? "out" : ""} ${ds === t ? "today" : ""} ${ds === selDay ? "sel" : ""} ${past ? "past" : ""} ${we ? "we" : ""}" ${out ? 'aria-hidden="true"' : `data-day="${ds}" role="button" tabindex="0"`} aria-label="${esc(fmtDay(d))}${past ? " (ya pasó)" : ""}, ${evs.length} eventos">
+      <span class="n"><b>${d.getDate()}</b>${ds === t ? "<small>Hoy</small>" : ""}</span>
+      ${evs.slice(0, 3).map(e => `<span class="ev ${e.done ? "done" : ""}" style="--c:${tColor(e.type)};color:${tColor(e.type)}">${esc((e.time ? e.time + " " : "") + e.title)}</span>`).join("")}
+      ${evs.length > 3 ? `<span class="more">+${evs.length - 3} más</span>` : ""}
+      ${!past && !out ? `<button type="button" class="add-mini" data-new data-newdate="${ds}" aria-label="Agendar el ${esc(fmtDay(d))}">${ico("plus")}</button>` : ""}
+      ${evs.length && !past ? `<span class="load"><i style="width:${Math.round(evs.length / maxDay * 100)}%"></i></span>` : ""}</div>`;
   }
   $("#cal").innerHTML = html;
-  $("#legend").innerHTML = Object.entries(TYPES).map(([k, v]) => `<span class="badge c-${k}"><i></i>${v}</span>`).join("");
-  const sd = parseYmd(selDay), rel = relDay(selDay), past = isPastDay(selDay);
-  $("#dayBig").innerHTML = `<span class="d">${sd.getDate()}</span><div><div class="t">${esc(rel || cap1(sd.toLocaleDateString("es-CO", { weekday: "long" })))}</div><div class="s">${esc(cap1(fmtDay(sd)))}</div></div>`;
-  const list = onDay(selDay);
-  $("#dayList").innerHTML = list.length ? list.map(evCard).join("") : `<div class="empty">${ico(past ? "reloj" : "agenda")}${past ? "Este día ya pasó." : "Día libre."}</div>`;
-  const add = $("#dayAdd"); add.disabled = past; add.innerHTML = past ? `${ico("info")}Este día ya pasó` : `${ico("plus")}Agregar en este día`;
+  renderDayPanel();
 }
-function evCard(e) {
-  const L = evLoc(e); const c = `var(--t-${TYPES[e.type] ? e.type : "cita"})`;
-  return `<div class="ev-card ${e.done ? "done" : ""}" style="--c:${c}">
-    <div class="top"><span class="badge ${typeC(e.type)}"><i></i>${TYPES[e.type] || "Cita"}</span>${e.done ? '<span class="badge" style="--c:var(--ok)">Cumplida</span>' : ""}${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div>
-    <div class="t">${esc(e.title)}</div>
-    <div class="s"><b style="color:var(--text)">${fmtTime(e.time)}</b> · ${fmtDur(Number(e.duration) || 60)}${L ? " · " + esc(locLabel(L)) : ""}${e.place ? "<br>" + esc(e.place) : ""}${e.contact ? "<br>Con: " + esc(e.contact) : ""}${e.notes ? `<br><span style="color:var(--text)">${esc(e.notes)}</span>` : ""}</div>
-    <div class="acts"><button class="btn sm ${e.done ? "" : "ok"}" data-toggle="${esc(e.id)}">${ico("check")}${e.done ? "Pendiente" : "Cumplida"}</button>${L ? `<a class="btn sm waze" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a>` : ""}<button class="btn sm" data-edit="${esc(e.id)}">${ico("edit")}Editar</button><button class="btn sm danger" data-del="${esc(e.id)}" aria-label="Eliminar">${ico("trash")}</button></div></div>`;
+function renderDayPanel() {
+  const sd = parseYmd(selDay), past = isPastDay(selDay), list = onDay(selDay);
+  const timed = list.filter(e => e.time), untimed = list.filter(e => !e.time);
+  let html = `<div class="dp-head"><div class="dp-date ${past ? "past" : ""}"><b>${sd.getDate()}</b><span>${esc(MONTHS[sd.getMonth()].slice(0, 3))}</span></div>
+    <div style="min-width:0;flex:1"><div class="t">${esc(cap1(sd.toLocaleDateString("es-CO", { weekday: "long" })))}</div><div class="s">${esc(relLong(selDay))}${list.length ? " · " + list.length + (list.length === 1 ? " evento" : " eventos") : ""}</div></div>
+    ${past ? "" : `<button class="btn sm primary" data-new data-newdate="${selDay}">${ico("plus")}Agregar</button>`}</div>`;
+  if (!list.length) {
+    html += `<div class="free">${ico(past ? "reloj" : "sol")}<b>${past ? "Este día ya pasó" : "Día libre"}</b><span>${past ? "No se puede agendar en días pasados." : "No tienes nada agendado. Toca Agregar o el + de cualquier día."}</span></div>`;
+  } else {
+    if (untimed.length) html += `<div class="allday">${untimed.map(e => evBlockStatic(e)).join("")}</div>`;
+    if (timed.length) {
+      const startH = Math.max(0, Math.min(7, ...timed.map(e => evStart(e).getHours())) );
+      const endH = Math.min(24, Math.max(19, ...timed.map(e => Math.ceil((evEnd(e).getHours() * 60 + evEnd(e).getMinutes()) / 60))));
+      const PX = 52; const hgt = (endH - startH) * PX;
+      let rail = "";
+      for (let h = startH; h <= endH; h++) { const top = (h - startH) * PX; rail += `<div class="hl" style="top:${top}px"></div><div class="hr" style="top:${top}px">${h === 12 ? "12 m" : (h % 12 || 12) + (h < 12 ? " am" : " pm")}</div>`; }
+      if (selDay === TODAY()) { const n = NOW(); const mm = (n.getHours() - startH) * 60 + n.getMinutes(); if (mm >= 0 && mm <= (endH - startH) * 60) rail += `<div class="now" style="top:${mm / 60 * PX}px" aria-label="Ahora"></div>`; }
+      // columnas si se cruzan
+      const cols = []; timed.forEach(e => { let c = 0; while (cols[c] && cols[c].some(x => evStart(x) < evEnd(e) && evEnd(x) > evStart(e))) c++; (cols[c] = cols[c] || []).push(e); e.__c = c; });
+      const nc = Math.max(1, cols.length);
+      timed.forEach(e => { const s = evStart(e); const top = ((s.getHours() - startH) * 60 + s.getMinutes()) / 60 * PX; const h = Math.max(40, (Number(e.duration) || 60) / 60 * PX - 4); const L = evLoc(e);
+        rail += `<button type="button" class="blk ${e.done ? "done" : ""}" data-open="${esc(e.id)}" style="--c:${tColor(e.type)};top:${top + 2}px;height:${h}px;left:calc(8px + ${e.__c * (100 / nc)}%);width:calc(${100 / nc}% - 14px)">${tIco(e.type)}<div style="min-width:0"><div class="bt">${esc(e.title)}</div><div class="bs">${fmtTime(e.time)}${L ? " · " + esc(L.name) : ""}</div></div></button>`; });
+      html += `<div class="rail" style="height:${hgt}px">${rail}</div>`;
+    }
+  }
+  $("#dayPanel").innerHTML = html;
 }
-function renderUpList() {
-  const t = TODAY(); const evs = sorted().filter(e => e.date >= t);
-  if (!evs.length) { $("#upList").innerHTML = `<div class="empty">${ico("agenda")}No tienes compromisos de hoy en adelante.<button class="btn sm primary" data-new>${ico("plus")}Agendar algo</button></div>`; return; }
-  const groups = {}; evs.forEach(e => (groups[e.date] = groups[e.date] || []).push(e));
-  $("#upList").innerHTML = Object.entries(groups).map(([ds, list]) => { const d = parseYmd(ds); const rel = relDay(ds); const dl = Math.round((d - parseYmd(t)) / 864e5);
-    return `<div class="list-group"><div class="list-h">${rel ? rel + " · " : ""}${esc(fmtDay(d))}${!rel ? ` · en ${dl} días` : ""}</div>${list.map(evCard).join("")}</div>`; }).join("");
+function evBlockStatic(e) { const L = evLoc(e); return `<button type="button" class="blk ${e.done ? "done" : ""}" data-open="${esc(e.id)}" style="--c:${tColor(e.type)};position:relative;left:0">${tIco(e.type)}<div style="min-width:0"><div class="bt">${esc(e.title)}</div><div class="bs">Todo el día${L ? " · " + esc(L.name) : ""}</div></div></button>`; }
+function evCard(e) { return feedEvent(e); }
+/* Detalle de un evento (toque en cualquier evento) */
+function openEventDetail(e) {
+  const L = evLoc(e); const past = evEnd(e) < NOW();
+  const sh = openSheet(`<div class="sheet-h"><span class="eyebrow">${esc(TYPES[e.type] || "Cita")}</span><button class="icon-btn" data-close aria-label="Cerrar">${ico("x")}</button></div>
+    <div class="ev-detail"><div class="hd">${tIco(e.type)}<div style="min-width:0"><h2>${esc(e.title)}</h2><div class="muted">${esc(cap1(fmtDay(evStart(e))))} · ${fmtTime(e.time)} · ${fmtDur(Number(e.duration) || 60)}</div></div></div>
+      ${!past && !e.done ? `<div class="count" id="dCount"></div>` : ""}
+      <div class="kv-list">${L ? `<div>${ico("pin")}<span>${esc(locLabel(L))}${e.place ? "<br><span class='muted'>" + esc(e.place) + "</span>" : ""}</span></div>` : ""}
+        ${e.contact ? `<div>${ico("perfil")}<span>${esc(e.contact)}</span></div>` : ""}${e.notes ? `<div>${ico("edit")}<span>${esc(e.notes)}</span></div>` : ""}
+        ${L && !sameLoc(L, homeLoc()) ? `<div>${ico("carro")}<span id="dTrip">Calculando desde tu casa…</span></div>` : ""}
+        ${!L && !e.contact && !e.notes ? `<div>${ico("info")}<span class="muted">Sin lugar ni notas.</span></div>` : ""}</div>
+    </div>
+    <div class="sheet-f" style="justify-content:flex-start"><button class="btn ${e.done ? "" : "ok"}" id="dDone">${ico("check")}${e.done ? "Marcar pendiente" : "Marcar cumplida"}</button>${L ? `<a class="btn waze" href="${wazeUrl(L)}" target="_blank" rel="noopener">${ico("nav")}Waze</a>` : ""}<button class="btn" id="dEdit">${ico("edit")}Editar</button><button class="btn danger" id="dDel" aria-label="Eliminar">${ico("trash")}</button></div>`, { label: "Detalle del evento" });
+  if ($("#dCount")) { const ms = evStart(e) - NOW(); const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+    $("#dCount").innerHTML = ms > 0 ? (d ? `<div><b>${d}</b><span>días</span></div>` : "") + `<div><b>${pad(h)}</b><span>horas</span></div><div><b>${pad(m)}</b><span>min</span></div>` : `<div><b style="color:var(--ok)">Ahora</b><span>en curso</span></div>`; }
+  if ($("#dTrip")) routeInfo(homeLoc(), L).then(r => { const x = $("#dTrip"); if (!x || !r) return; const leave = new Date(evStart(e).getTime() - (r.min + 15) * 6e4);
+    x.innerHTML = `Desde tu casa: <b>${tripText(r)}</b>${r.src !== "vuelo" && e.time && !past ? `<br><span class="muted">Sal antes de las ${fmtClock(leave)} ${leave.getHours() >= 12 ? "p. m." : "a. m."}</span>` : ""}`; });
+  $("#dDone").onclick = () => { closeSheet(); updDoc("events", e.id, { done: !e.done }); if (!e.done) toast("¡Cumplida! " + e.title, "ok", "completar"); };
+  $("#dEdit").onclick = () => openEventSheet(e);
+  $("#dDel").onclick = () => { closeSheet(true); confirmDelete(e.id); };
 }
-$("#calPrev").addEventListener("click", () => { calM = new Date(calM.getFullYear(), calM.getMonth() - 1, 1); renderAgenda(); });
-$("#calNext").addEventListener("click", () => { calM = new Date(calM.getFullYear(), calM.getMonth() + 1, 1); renderAgenda(); });
-$("#calToday").addEventListener("click", () => { calM = minMonth(); selDay = TODAY(); agView = "mes"; renderAgenda(); });
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-open]"); if (!b) return; const e = S.events.find(x => x.id === b.dataset.open); if (e) openEventDetail(e); });
+document.addEventListener("keydown", ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".day[data-day]")) { ev.preventDefault(); ev.target.click(); } });
+
+/* Lista tipo línea de tiempo */
+function feedEvent(e) {
+  const L = evLoc(e); const away = L && !sameLoc(L, homeLoc());
+  const dl = Math.round((parseYmd(e.date) - parseYmd(TODAY())) / 864e5);
+  const soon = !e.done && e.date === TODAY() && e.time ? Math.round((evStart(e) - NOW()) / 6e4) : null;
+  return `<button type="button" class="fev ${e.done ? "done" : ""}" data-open="${esc(e.id)}" style="--c:${tColor(e.type)}">
+    <div class="tm"><b>${e.time || "—"}</b><span>${e.time ? fmtDur(Number(e.duration) || 60) : "todo el día"}</span></div>
+    <div class="mid">${tIco(e.type)}<div style="min-width:0"><div class="ttl">${esc(e.title)}</div><div class="sub">${esc(TYPES[e.type] || "Cita")}${L ? " · " + esc(locLabel(L)) : ""}${e.place ? " · " + esc(e.place) : ""}</div></div></div>
+    <div class="chips">${e.done ? '<span class="badge" style="--c:var(--ok)"><i></i>Cumplida</span>' : soon != null && soon > 0 && soon < 180 ? `<span class="badge" style="--c:var(--bad)"><i></i>en ${fmtDur(soon)}</span>` : dl > 1 ? `<span class="badge"><i></i>en ${dl} días</span>` : ""}${away ? `<span class="badge" style="--c:var(--t-viaje)">${ico("carro")}Fuera de casa</span>` : ""}${isEx(e) ? '<span class="tag">EJEMPLO</span>' : ""}</div></button>`;
+}
+function weekLabel(monday) {
+  const t = parseYmd(TODAY()); const tm = new Date(t); tm.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+  const diff = Math.round((monday - tm) / (7 * 864e5)); const sun = new Date(monday); sun.setDate(monday.getDate() + 6);
+  const range = `${monday.getDate()} ${MONTHS[monday.getMonth()].slice(0, 3)} – ${sun.getDate()} ${MONTHS[sun.getMonth()].slice(0, 3)}`;
+  return [diff === 0 ? "Esta semana" : diff === 1 ? "Próxima semana" : "Semana del " + monday.getDate() + " de " + MONTHS[monday.getMonth()], range];
+}
+function renderFeed() {
+  const filt = $("#feedFilters");
+  filt.innerHTML = `<button type="button" data-ft="todos" aria-pressed="${feedType === "todos"}">Todo</button>` + Object.entries(TYPES).map(([k, v]) => `<button type="button" class="c-${k}" data-ft="${k}" aria-pressed="${feedType === k}">${ico(TICO[k])}${v}</button>`).join("");
+  filt.querySelectorAll("[data-ft]").forEach(b => b.onclick = () => { feedType = b.dataset.ft; Sfx.play("toque"); renderFeed(); });
+  const t = TODAY(); const q = norm(feedQ);
+  const evs = sorted().filter(e => e.date >= t && (feedType === "todos" || (TYPES[e.type] ? e.type : "cita") === feedType) && (!q || norm(e.title + " " + (e.city || "") + " " + (e.place || "") + " " + (e.contact || "")).includes(q)));
+  if (!evs.length) { $("#upList").innerHTML = `<div class="free">${ico(q || feedType !== "todos" ? "buscar" : "sol")}<b>${q || feedType !== "todos" ? "Nada con ese filtro" : "Agenda despejada"}</b><span>${q || feedType !== "todos" ? "Prueba con otro tipo o búsqueda." : "No tienes compromisos de hoy en adelante."}</span><button class="btn sm primary" data-new>${ico("plus")}Agendar algo</button></div>`; return; }
+  const weeks = []; evs.forEach(e => { const d = parseYmd(e.date); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const k = ymd(mon);
+    let w = weeks.find(x => x.k === k); if (!w) { w = { k, mon, days: [] }; weeks.push(w); } let dd = w.days.find(x => x.ds === e.date); if (!dd) { dd = { ds: e.date, evs: [] }; w.days.push(dd); } dd.evs.push(e); });
+  let prev = null;
+  $("#upList").innerHTML = weeks.map(w => { const [wl, range] = weekLabel(w.mon); const n = w.days.reduce((s, d) => s + d.evs.length, 0);
+    return `<div class="wk"><div class="wk-h">${wl}<span class="range">${range}</span><span class="badge" style="--c:var(--acc)">${n} ${n === 1 ? "evento" : "eventos"}</span></div>${w.days.map(d => {
+      const dt = parseYmd(d.ds); let gap = "";
+      if (prev) { const g = Math.round((dt - parseYmd(prev)) / 864e5) - 1; if (g >= 1) gap = `<div class="gap">${g === 1 ? "1 día libre" : g + " días libres"}</div>`; }
+      prev = d.ds; const rel = relDay(d.ds);
+      return gap + `<div class="fday"><div class="ftile ${d.ds === t ? "today" : ""}"><b>${dt.getDate()}</b><span>${DOWS[(dt.getDay() + 6) % 7]}</span></div>
+        <div class="fday-body"><div class="fday-h">${rel ? `<span class="rel">${rel}</span>·` : ""}<span>${esc(cap1(fmtDay(dt)))}</span></div>${d.evs.map(feedEvent).join("")}</div></div>`; }).join("")}</div>`; }).join("");
+}
 $("#vwMes").addEventListener("click", () => { agView = "mes"; renderAgenda(); });
 $("#vwLista").addEventListener("click", () => { agView = "lista"; renderAgenda(); });
-$("#dayAdd").addEventListener("click", () => { if (!isPastDay(selDay)) openEventSheet(null, { date: selDay }); });
+$("#feedQ").addEventListener("input", e => { feedQ = e.target.value; renderFeed(); });
 
 /* ───────────────────────── Hoja de cita ───────────────────────── */
 function openEventSheet(e, preset) {
@@ -665,7 +753,7 @@ async function startMap() {
   if (mapFailed) return renderMapPanel();
   if (!MAP) {
     if (!MAPDATA) await loadGeo();
-    if (!WORLD) { try { WORLD = await (await fetch("data/mundo.json")).json(); } catch (e) { WORLD = { mundo: [], colombia: [] }; } }
+    if (!WORLD) { try { WORLD = await (await fetch("data/colombia-hex.json")).json(); } catch (e) { WORLD = { hex: [] }; } }
     if (MAP || current !== "mapa") return;
     try { MAP = window.CronovaMapa.create($("#mapCanvas"), $("#mapOver"), MAPDATA, WORLD); }
     catch (e) { console.warn(e); mapFailed = true; $("#mapBox").insertAdjacentHTML("beforeend", `<div class="map-fallback">Tu dispositivo no pudo abrir el globo 3D. El recorrido de la derecha sigue funcionando.</div>`); return renderMapPanel(); }
@@ -675,8 +763,8 @@ async function startMap() {
       showTip({ n: s.label, d: st ? st.loc.dept : "", lat: s.lat, lon: s.lon }, at, false, st ? st.events : []); };
     MAP.setHome(homeLoc());
     $("#mzIn").onclick = () => MAP.zoom(.6); $("#mzOut").onclick = () => MAP.zoom(1.6);
-    const setV = v => { $("#mvCol").setAttribute("aria-pressed", v === "colombia"); $("#mvMundo").setAttribute("aria-pressed", v === "mundo"); MAP.view(v); closeTip(); };
-    $("#mvCol").onclick = () => setV("colombia"); $("#mvMundo").onclick = () => setV("mundo");
+    $("#mvAll").onclick = () => { MAP.view(); closeTip(); };
+    $("#mapBox").insertAdjacentHTML("beforeend", `<div class="legend-reg" aria-label="Regiones">${MAP.regions().map(r => `<span><i style="--c:${r.c || "color-mix(in srgb,var(--acc) 62%,#fff)"}"></i>${r.n}</span>`).join("")}</div>`);
     $("#mHome").onclick = () => { const h = homeLoc(); MAP.flyTo(h.lat, h.lon, 1.5); };
     $("#mFit").onclick = () => fitMonth();
     makeCombo($("#mapSearchBox"), $("#mapSearch"), p => { MAP.flyTo(p.lat, p.lon, 1.4); setTimeout(() => showTip(p, MAP.screenOf(p.lat, p.lon)), reduceMotion() ? 30 : 950); });

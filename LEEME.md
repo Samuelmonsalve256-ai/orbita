@@ -20,7 +20,7 @@ Tu centro de mando personal: agenda, alertas, resumen de la mañana, asistente c
 | `js/mapa.js` | Mapa 3D de Colombia |
 | `js/vendor/` | Librerías incluidas (three.js, supabase-js) para que funcione sin depender de otros servidores |
 | `data/colombia.json` | Departamentos y municipios con sus coordenadas |
-| `data/mundo.json` | El mundo en hexágonos para el globo (Natural Earth) |
+| `data/colombia-hex.json` | Colombia en hexágonos por departamento para el planeta del mapa |
 | `manifest.webmanifest`, `icono-*.png`, `img/` | Ícono y logo para instalarla en el iPhone y el Mac |
 | `sw.js` | Guarda la app para que abra rápido y sin internet (no guarda tus datos) |
 | `supabase/01_orbita.sql` | Crea las tablas, las reglas de seguridad y el historial |
